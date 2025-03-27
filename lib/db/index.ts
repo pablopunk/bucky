@@ -1,15 +1,15 @@
-import Database from "better-sqlite3"
+import { Database } from "bun:sqlite"
 import path from "path"
 import { schema } from "./schema"
 import { runMigrations } from "./migrations"
 import fs from "fs"
 
 // Cache for database connections
-const connections = new Map<number, Database.Database>()
+const connections = new Map<number, Database>()
 let schemaInitialized = false
 
 // Get or create a database connection for the current thread/process
-export function getDatabase(): Database.Database {
+export function getDatabase(): Database {
   // Get unique identifier for the current thread/process
   const threadId = process.pid || 1
 
@@ -24,21 +24,16 @@ export function getDatabase(): Database.Database {
 
     // Initialize database
     const dbPath = path.join(dataDir, "bucky.db")
-    const db = new Database(dbPath, {
-      // Set busy timeout to handle concurrent access
-      timeout: 5000, // 5 second timeout
-      // Use WAL mode for better concurrency
-      verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
-    })
+    const db = new Database(dbPath)
     
     // Enable WAL mode for better concurrency
-    db.pragma("journal_mode = WAL")
+    db.run("PRAGMA journal_mode = WAL")
     
     // Set busy timeout
-    db.pragma("busy_timeout = 5000")
+    db.run("PRAGMA busy_timeout = 5000")
     
     // Enable foreign keys
-    db.pragma("foreign_keys = ON")
+    db.run("PRAGMA foreign_keys = ON")
     
     // Cache connection
     connections.set(threadId, db)
@@ -47,7 +42,7 @@ export function getDatabase(): Database.Database {
     if (!schemaInitialized) {
       try {
         // Check if the schema needs to be initialized
-        const tableCount = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table'").get() as { count: number }
+        const tableCount = db.query("SELECT count(*) as count FROM sqlite_master WHERE type='table'").get() as { count: number }
         
         if (tableCount.count === 0) {
           console.log("Initializing database schema...")
@@ -100,17 +95,17 @@ export function closeAllDatabases(): void {
 // Helper functions for common database operations
 export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   const db = getDatabase()
-  return db.prepare(sql).all(...params) as T[]
+  return db.query(sql).all(...params) as T[]
 }
 
 export async function queryOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
   const db = getDatabase()
-  return db.prepare(sql).get(...params) as T | null
+  return db.query(sql).get(...params) as T | null
 }
 
 export async function execute(sql: string, params: any[] = []): Promise<void> {
   const db = getDatabase()
-  db.prepare(sql).run(...params)
+  db.run(sql, ...params)
 }
 
 // Type definitions for database tables
@@ -205,17 +200,17 @@ export function createStorageProvider(data: Omit<StorageProvider, "id" | "create
   const id = generateId()
   const now = getTimestamp()
   
-  db.prepare(
-    `INSERT INTO storage_providers (id, name, type, config, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, data.name, data.type, data.config, data.status, now, now)
+  db.query(
+    `INSERT INTO storage_providers (id, name, type, config, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, data.name, data.type, data.config, now, now)
   
   return id
 }
 
 export function getStorageProvider(id: string): StorageProvider | null {
   const db = getDatabase()
-  return db.prepare(
+  return db.query(
     `SELECT * FROM storage_providers WHERE id = ?`
   ).get(id) as StorageProvider | null
 }
@@ -226,7 +221,7 @@ export function createSmtpConfig(data: Omit<SMTPConfig, "id" | "created_at" | "u
   const id = generateId()
   const now = getTimestamp()
   
-  db.prepare(
+  db.query(
     `INSERT INTO smtp_config (
       id, host, port, username, password, from_email, from_name,
       created_at, updated_at
@@ -241,7 +236,7 @@ export function createSmtpConfig(data: Omit<SMTPConfig, "id" | "created_at" | "u
 
 export function getSmtpConfig(): SMTPConfig | null {
   const db = getDatabase()
-  return db.prepare(
+  return db.query(
     `SELECT * FROM smtp_config ORDER BY id DESC LIMIT 1`
   ).get() as SMTPConfig | null
 }
@@ -252,7 +247,7 @@ export function createBackupJob(data: Omit<BackupJob, "id" | "created_at" | "upd
   const id = generateId()
   const now = getTimestamp()
   
-  db.prepare(
+  db.query(
     `INSERT INTO backup_jobs (
       id, name, source_path, storage_provider_id, schedule,
       retention_period, compression_enabled, compression_level, status,
@@ -279,7 +274,7 @@ export function createBackupJob(data: Omit<BackupJob, "id" | "created_at" | "upd
 
 export function getBackupJob(id: string): BackupJob | null {
   const db = getDatabase()
-  return db.prepare(
+  return db.query(
     `SELECT * FROM backup_jobs WHERE id = ?`
   ).get(id) as BackupJob | null
 }

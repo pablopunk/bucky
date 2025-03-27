@@ -158,10 +158,6 @@ export default function EditBackupJobPage({ params }: { params: { id: string } }
                     required
                     className="flex-1"
                   />
-                  <Button variant="outline" type="button">
-                    <Folder className="mr-2 h-4 w-4" />
-                    Browse
-                  </Button>
                 </div>
               </div>
               <div className="space-y-2">

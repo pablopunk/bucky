@@ -1,47 +1,104 @@
-import Database from "better-sqlite3"
+import { Database } from "bun:sqlite"
 import path from "path"
+import { schema } from "./db/schema"
+import { runMigrations } from "./db/migrations"
 import fs from "fs"
 import logger from "@/lib/logger"
 
-// Track active database connections
-const activeConnections: Database.Database[] = [];
+// Cache for database connections
+const connections = new Map<number, Database>()
+let schemaInitialized = false
 
-// Create a database connection
-export function getDatabase() {
-  // Get the database path from env or use default
-  const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "bucky.db")
-  
-  // Ensure the directory exists
-  const dbDir = path.dirname(dbPath)
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true })
+// Track active database connections
+const activeConnections: Database[] = [];
+
+// Get or create a database connection for the current thread/process
+export function getDatabase(): Database {
+  // Get unique identifier for the current thread/process
+  const threadId = process.pid || 1
+
+  if (!connections.has(threadId)) {
+    logger.info(`Creating new database connection for thread/process ${threadId}`)
+    
+    // Ensure data directory exists
+    const dataDir = path.join(process.cwd(), "data")
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true })
+    }
+
+    // Initialize database
+    const dbPath = path.join(dataDir, "bucky.db")
+    const db = new Database(dbPath)
+    
+    // Enable WAL mode for better concurrency
+    db.run("PRAGMA journal_mode = WAL")
+    
+    // Set busy timeout
+    db.run("PRAGMA busy_timeout = 5000")
+    
+    // Enable foreign keys
+    db.run("PRAGMA foreign_keys = ON")
+    
+    // Cache connection
+    connections.set(threadId, db)
+    
+    // Initialize schema only once
+    if (!schemaInitialized) {
+      try {
+        // Check if the schema needs to be initialized
+        const tableCount = db.query("SELECT count(*) as count FROM sqlite_master WHERE type='table'").get() as { count: number }
+        
+        if (tableCount.count === 0) {
+          logger.info("Initializing database schema...")
+          // Initialize schema - execute as a single transaction
+          db.exec(schema)
+          schemaInitialized = true
+        }
+        
+        // Run migrations for schema updates
+        runMigrations()
+      } catch (error) {
+        logger.error("Error initializing database:", error)
+      }
+    }
   }
   
-  // Log database connection
-  logger.info(`Creating new database connection for thread/process ${process.pid}`)
-  
-  // Create a new database connection
-  const db = new Database(dbPath, {
-    verbose: (message) => logger.debug(`SQL: ${message}`),
-  })
-  
-  // Configure SQLite for better concurrency and reliability
-  db.pragma("journal_mode = WAL")
-  db.pragma("busy_timeout = 5000")
-  db.pragma("foreign_keys = ON")
-  
-  // Run migrations if needed
-  runMigrations(db)
-  
   // Track the connection
-  activeConnections.push(db);
+  activeConnections.push(connections.get(threadId)!)
   
-  // Return the database connection
-  return db
+  return connections.get(threadId)!
 }
 
-// Close all active database connections
-export function closeAllDatabases() {
+// For compatibility with legacy code patterns that use prepare().run()
+export function prepareStatement(sql: string): { run: (...params: any[]) => void; get: (...params: any[]) => any; all: (...params: any[]) => any[] } {
+  const db = getDatabase();
+  const statement = db.query(sql);
+  
+  return {
+    run: (...params: any[]) => statement.run(...params),
+    get: (...params: any[]) => statement.get(...params),
+    all: (...params: any[]) => statement.all(...params)
+  };
+}
+
+// Close database connection for the current thread
+export function closeDatabase(): void {
+  const threadId = process.pid || 1
+  
+  if (connections.has(threadId)) {
+    try {
+      const db = connections.get(threadId)!
+      db.close()
+      connections.delete(threadId)
+      logger.info(`Closed database connection for thread/process ${threadId}`)
+    } catch (error) {
+      logger.error(`Error closing database connection for thread/process ${threadId}:`, error)
+    }
+  }
+}
+
+// Close all database connections
+export function closeAllDatabases(): void {
   logger.info(`Closing ${activeConnections.length} database connections`);
   
   let closedCount = 0;
@@ -67,31 +124,27 @@ export function closeAllDatabases() {
   }
 }
 
-// Run database migrations
-function runMigrations(db: Database.Database) {
-  try {
-    // Check if tables exist
-    const tableCount = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table'").get() as { count: number } | undefined;
-    
-    logger.info("Running database migrations...")
-    
-    // Start transaction
-    db.prepare("BEGIN TRANSACTION;").run();
-    
-    // Run your migrations here...
-    // This is just a placeholder - your actual migrations would go here
-    
-    // Commit transaction
-    db.prepare("COMMIT;").run();
-    
-    logger.info("Database migrations completed successfully");
-  } catch (error) {
-    // Rollback on error
-    db.prepare("ROLLBACK;").run();
-    logger.error("Error running database migrations:", { error });
-    throw error;
-  }
+// Helper functions for common database operations
+export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  const db = getDatabase()
+  return db.query(sql).all(...params) as T[]
 }
+
+export async function queryOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
+  const db = getDatabase()
+  return db.query(sql).get(...params) as T | null
+}
+
+export async function execute(sql: string, params: any[] = []): Promise<void> {
+  const db = getDatabase()
+  db.run(sql, ...params)
+}
+
+// For backwards compatibility with API routes
+export const prepare = prepareStatement;
+
+// Export all from our database module for easy imports
+export * from "./db/index";
 
 // Define types for database entities
 export interface BackupJob {

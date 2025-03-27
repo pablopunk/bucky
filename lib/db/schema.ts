@@ -1,4 +1,4 @@
-import type { Database } from "better-sqlite3"
+import type { Database } from "bun:sqlite"
 
 export interface StorageCredentials {
   type: "s3" | "b2" | "storj"

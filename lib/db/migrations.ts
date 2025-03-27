@@ -20,35 +20,35 @@ export function runMigrations() {
   
   try {
     // Add next_run column if it doesn't exist
-    const hasNextRun = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='next_run'`).get() as ColumnResult;
+    const hasNextRun = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='next_run'`).get() as ColumnResult;
     if (hasNextRun.count === 0) {
       console.log('Adding next_run column to backup_jobs table');
       db.exec(`ALTER TABLE backup_jobs ADD COLUMN next_run INTEGER NULL;`);
     }
     
     // Add last_run column if it doesn't exist
-    const hasLastRun = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='last_run'`).get() as ColumnResult;
+    const hasLastRun = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='last_run'`).get() as ColumnResult;
     if (hasLastRun.count === 0) {
       console.log('Adding last_run column to backup_jobs table');
       db.exec(`ALTER TABLE backup_jobs ADD COLUMN last_run INTEGER NULL;`);
     }
     
     // Add remote_path column if it doesn't exist
-    const hasRemotePath = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='remote_path'`).get() as ColumnResult;
+    const hasRemotePath = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='remote_path'`).get() as ColumnResult;
     if (hasRemotePath.count === 0) {
       console.log('Adding remote_path column to backup_jobs table');
       db.exec(`ALTER TABLE backup_jobs ADD COLUMN remote_path TEXT NOT NULL DEFAULT '/';`);
     }
     
     // Add compression_level column if it doesn't exist
-    const hasCompressionLevel = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_level'`).get() as ColumnResult;
+    const hasCompressionLevel = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_level'`).get() as ColumnResult;
     if (hasCompressionLevel.count === 0) {
       console.log('Adding compression_level column to backup_jobs table');
       db.exec(`ALTER TABLE backup_jobs ADD COLUMN compression_level INTEGER NOT NULL DEFAULT 6;`);
     }
     
     // Run migration for notification_settings if the email column doesn't exist
-    const hasEmailColumn = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('notification_settings') WHERE name='email'`).get() as ColumnResult;
+    const hasEmailColumn = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('notification_settings') WHERE name='email'`).get() as ColumnResult;
     if (hasEmailColumn.count === 0) {
       console.log('Running migration to update notification_settings table structure');
       
@@ -64,7 +64,7 @@ export function runMigrations() {
     }
     
     // Check if the theme column exists in settings table
-    const hasThemeColumn = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('settings') WHERE name='theme'`).get() as ColumnResult;
+    const hasThemeColumn = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('settings') WHERE name='theme'`).get() as ColumnResult;
     if (hasThemeColumn.count === 0) {
       console.log('Adding theme column to settings table');
       db.exec(`ALTER TABLE settings ADD COLUMN theme TEXT DEFAULT 'system';`);
@@ -81,7 +81,7 @@ export function runMigrations() {
     `);
     
     // Check if the storage_providers.status column exists and run migration to remove it
-    const hasStatusColumn = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('storage_providers') WHERE name='status'`).get() as ColumnResult;
+    const hasStatusColumn = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('storage_providers') WHERE name='status'`).get() as ColumnResult;
     if (hasStatusColumn.count > 0) {
       console.log('Running migration to remove status column from storage_providers table');
       

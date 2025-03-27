@@ -3,6 +3,7 @@ import { createStorageProvider, getStorageProvider, getDatabase } from "@/lib/db
 import type { StorageProvider, StorageProviderCredentials } from "@/lib/db";
 import { StorageProviderManager } from "@/lib/storage";
 import { z } from "zod";
+import { prepare } from "@/lib/db";
 
 const s3CredentialsSchema = z.object({
   type: z.literal("s3"),
@@ -52,7 +53,6 @@ export async function POST(request: Request) {
       name: validatedData.name,
       type: validatedData.type,
       config: JSON.stringify(validatedData.credentials),
-      status: "active",
     });
 
     return NextResponse.json({ id });
@@ -84,8 +84,8 @@ export async function GET(request: Request) {
     }
 
     const db = getDatabase();
-    const providers = db.prepare(
-      `SELECT id, name, type, status, created_at, updated_at FROM storage_providers`
+    const providers = prepare(
+      `SELECT id, name, type, created_at, updated_at FROM storage_providers`
     ).all();
 
     return NextResponse.json(providers);
@@ -119,15 +119,14 @@ export async function PUT(request: Request) {
 
     // If validation succeeds, update in database
     const db = getDatabase();
-    db.prepare(
+    prepare(
       `UPDATE storage_providers 
-       SET name = ?, type = ?, config = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+       SET name = ?, type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     ).run(
       validatedData.name,
       validatedData.type,
       JSON.stringify(validatedData.credentials),
-      "active",
       id
     );
 
@@ -157,7 +156,7 @@ export async function DELETE(request: Request) {
     }
 
     const db = getDatabase();
-    db.prepare(`DELETE FROM storage_providers WHERE id = ?`).run(id);
+    prepare(`DELETE FROM storage_providers WHERE id = ?`).run(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {
