@@ -87,15 +87,29 @@ export class BackupScheduler {
       const interval = parseExpression(job.schedule);
       const nextRun = interval.next().toDate();
 
+      console.log(`Scheduling job ${job.id} (${job.name}) to run at ${nextRun.toISOString()}`);
+
       // Update job status in database
       const db = getDatabase();
       db.prepare(
         `UPDATE backup_jobs 
          SET status = ?, next_run = ? 
          WHERE id = ?`
-      ).run(["active" as const, nextRun.toISOString(), job.id]);
+      ).run("active", nextRun.toISOString(), job.id);
 
-      console.log(`Scheduled job ${job.id} to run at ${nextRun.toISOString()}`);
+      // Cancel any existing timeout for this job
+      this.cancelJob(job.id);
+
+      // Schedule the job to run at the next run time
+      const now = new Date();
+      const delay = Math.max(0, nextRun.getTime() - now.getTime());
+      
+      if (delay < 60000) {
+        // If next run is less than a minute away, schedule it to run in the next check
+        console.log(`Job ${job.id} scheduled to run very soon (${delay}ms), will run in next check cycle`);
+      } else {
+        console.log(`Job ${job.id} scheduled to run in ${Math.floor(delay / 60000)} minutes`);
+      }
     } catch (error) {
       console.error(`Error scheduling job ${job.id}:`, error);
       // Update job status to failed
@@ -104,7 +118,7 @@ export class BackupScheduler {
         `UPDATE backup_jobs 
          SET status = ?, next_run = NULL 
          WHERE id = ?`
-      ).run(["failed" as const, job.id]);
+      ).run("failed", job.id);
     }
   }
 
@@ -253,26 +267,54 @@ export class BackupScheduler {
   async loadJobs(): Promise<void> {
     try {
       const db = getDatabase();
+      console.log("Loading jobs from database...");
+      
       const jobs = db.prepare(
         `SELECT * FROM backup_jobs WHERE status = 'active'`
       ).all() as BackupJob[];
 
-      console.log(`Loading ${jobs.length} active jobs`);
+      console.log(`Found ${jobs.length} active jobs:`, jobs);
       
-      // Don't schedule jobs immediately, just let the check interval handle them
+      // Schedule or update all active jobs
       for (const job of jobs) {
-        // Just update the next_run time if needed
-        if (!job.next_run) {
+        try {
+          console.log(`Processing job ${job.id} (${job.name}), current next_run:`, job.next_run);
+          
+          // Always calculate a new next_run time to ensure it's accurate
           const interval = parseExpression(job.schedule);
           const nextRun = interval.next().toDate();
+          
+          console.log(`Calculated new next_run for job ${job.id}: ${nextRun.toISOString()}`);
           
           db.prepare(
             `UPDATE backup_jobs 
              SET next_run = ? 
              WHERE id = ?`
           ).run(nextRun.toISOString(), job.id);
+          
+          // Update job in-memory with the new next_run time
+          job.next_run = nextRun.toISOString();
+          
+          console.log(`Updated job ${job.id} in database with next_run: ${nextRun.toISOString()}`);
+        } catch (error) {
+          console.error(`Error parsing cron for job ${job.id} (${job.name}):`, error);
+          
+          // Mark jobs with invalid cron expressions as failed
+          db.prepare(
+            `UPDATE backup_jobs 
+             SET status = ?, next_run = NULL 
+             WHERE id = ?`
+          ).run("failed", job.id);
         }
       }
+      
+      console.log('All jobs scheduled successfully');
+      
+      // Verify the jobs were actually updated in the database
+      const updatedJobs = db.prepare(
+        `SELECT id, name, next_run FROM backup_jobs WHERE status = 'active'`
+      ).all();
+      console.log("Updated jobs in database:", updatedJobs);
     } catch (error) {
       console.error('Error loading jobs:', error);
     }

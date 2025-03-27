@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/db";
 import type { BackupHistory } from "@/lib/db";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get('jobId');
+    
     const db = getDatabase();
-    const history = db.prepare(`
+    
+    let query = `
       SELECT 
         h.id,
         h.job_id,
@@ -18,9 +22,21 @@ export async function GET() {
         h.created_at
       FROM backup_history h
       LEFT JOIN backup_jobs j ON h.job_id = j.id
-      ORDER BY h.created_at DESC
-      LIMIT 10
-    `).all() as (BackupHistory & { job_name: string })[];
+    `;
+    
+    // If jobId is provided, filter by that job
+    if (jobId) {
+      query += ` WHERE h.job_id = ?`;
+    }
+    
+    query += ` ORDER BY h.created_at DESC LIMIT 10`;
+    
+    let history;
+    if (jobId) {
+      history = db.prepare(query).all(jobId) as (BackupHistory & { job_name: string })[];
+    } else {
+      history = db.prepare(query).all() as (BackupHistory & { job_name: string })[];
+    }
 
     return NextResponse.json(history);
   } catch (error) {

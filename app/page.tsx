@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, CheckCircle, XCircle, Clock } from "lucide-react"
+import { Plus, CheckCircle, XCircle, Clock, FileArchive } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface BackupStats {
   totalJobs: number
@@ -60,6 +61,7 @@ export default function DashboardPage() {
   const [storageProviders, setStorageProviders] = useState<StorageProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("overview")
 
   useEffect(() => {
     fetchStats()
@@ -146,10 +148,9 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="jobs">Backup Jobs</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
@@ -158,6 +159,7 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Backup Jobs</CardTitle>
+                  <FileArchive className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.totalJobs}</div>
@@ -169,6 +171,7 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Successful Backups</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.successfulBackups}</div>
@@ -178,6 +181,7 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Failed Backups</CardTitle>
+                  <XCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.failedBackups}</div>
@@ -187,9 +191,10 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Next Scheduled</CardTitle>
+                  <Clock className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats.nextScheduled.time}</div>
+                  <div className="text-2xl font-bold">{new Date(stats.nextScheduled.time).toUTCString()}</div>
                   <p className="text-xs text-muted-foreground">{stats.nextScheduled.jobName}</p>
                 </CardContent>
               </Card>
@@ -254,21 +259,42 @@ export default function DashboardPage() {
                   <CardDescription>Latest backup operations and events</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-5">
                     {activity.slice(0, 5).map((item) => (
-                      <div key={item.id} className="flex items-center space-x-4">
-                        {item.status === "success" && <CheckCircle className="h-5 w-5 text-green-500" />}
-                        {item.status === "failed" && <XCircle className="h-5 w-5 text-red-500" />}
-                        {item.status === "running" && <Clock className="h-5 w-5 text-blue-500" />}
+                      <div key={item.id} className="flex items-start gap-4">
+                        {item.status === "success" && <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />}
+                        {item.status === "failed" && <XCircle className="h-5 w-5 text-red-500 mt-0.5" />}
+                        {item.status === "running" && <Clock className="h-5 w-5 text-blue-500 mt-0.5" />}
                         <div className="flex-1 space-y-1">
-                          <p className="text-sm font-medium leading-none">{item.jobName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium leading-none">{item.jobName}</p>
+                            {item.status === "success" && (
+                              <Badge className="bg-green-500 text-white">Success</Badge>
+                            )}
+                            {item.status === "failed" && (
+                              <Badge variant="destructive">Failed</Badge>
+                            )}
+                            {item.status === "running" && (
+                              <Badge className="bg-blue-500 text-white">Running</Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">{item.message}</p>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(item.timestamp).toLocaleString()}
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(item.timestamp).toLocaleString()}
+                          </p>
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-6 text-right">
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="text-xs text-muted-foreground"
+                      onClick={() => setActiveTab("activity")}
+                    >
+                      View all activity
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -319,7 +345,7 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium leading-none">{item.jobName}</p>
                         <p className="text-sm text-muted-foreground">{item.message}</p>
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground font-mono">
                         {new Date(item.timestamp).toLocaleString()}
                       </div>
                     </div>

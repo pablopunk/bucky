@@ -18,6 +18,14 @@ export async function POST(request: Request) {
     // Validate SMTP configuration
     const config = smtpConfigSchema.parse(data)
 
+    // Fix common mistyping in Gmail's SMTP host
+    const host = config.host.trim().toLowerCase();
+    if (host === "smpt.gmail.com") {
+      config.host = "smtp.gmail.com";
+    } else if (host === "smtp.googlemail.com") {
+      config.host = "smtp.gmail.com";
+    }
+
     // Send test email
     await sendEmail({
       to: config.fromEmail,
@@ -42,14 +50,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error testing SMTP configuration:", error)
+    
+    // Provide more helpful error messages for common SMTP issues
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    // Check for common connection errors
+    if (errorMessage.includes("ECONNREFUSED")) {
+      return NextResponse.json(
+        { error: "Connection refused. Please check if the SMTP host and port are correct." },
+        { status: 500 }
+      )
+    } else if (errorMessage.includes("ETIMEDOUT")) {
+      return NextResponse.json(
+        { error: "Connection timed out. Please check your network and SMTP server settings." },
+        { status: 500 }
+      )
+    } else if (errorMessage.includes("ENOTFOUND")) {
+      return NextResponse.json(
+        { error: "Server not found. Please check if the SMTP host is correct." },
+        { status: 500 }
+      )
+    } else if (errorMessage.includes("authentication failed") || errorMessage.includes("Invalid login")) {
+      return NextResponse.json(
+        { error: "Authentication failed. Please check your username and password." },
+        { status: 500 }
+      )
+    }
+    
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid SMTP configuration", details: error.errors },
         { status: 400 }
       )
     }
+    
     return NextResponse.json(
-      { error: "Failed to send test email" },
+      { error: "Failed to send test email: " + errorMessage },
       { status: 500 }
     )
   }

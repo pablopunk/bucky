@@ -1,0 +1,93 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Bucky Backup Manager Architecture
+
+## Tech Stack Overview
+- **Framework**: Next.js 15.1.0 with App Router
+- **Runtime Environment**: Node.js (with Bun support)
+- **Language**: TypeScript
+- **UI Library**: React 19
+- **Styling**: TailwindCSS with shadcn/ui components (Radix UI primitives)
+- **Database**: SQLite with better-sqlite3
+- **State Management**: React Hooks
+- **Form Handling**: react-hook-form with Zod validation
+- **Notifications**: Sonner for toast notifications
+- **Scheduling**: node-schedule for job scheduling
+- **Storage Providers**: AWS S3, Backblaze B2, Storj integration
+
+## Core Architecture
+
+Bucky is a self-contained backup management system designed to run as a single Docker container or directly on a host machine. It combines a modern web interface with robust background job processing capabilities.
+
+### Database Structure
+The application uses SQLite with the following core tables:
+- `storage_providers`: Credentials for S3, B2, and Storj services
+- `backup_jobs`: Scheduled backup operations
+- `backup_history`: Record of past backup operations
+- `smtp_config`: Email notification settings
+- `notification_settings`: User notification preferences
+- `settings`: Application settings
+
+### File Organization
+- `/app`: Next.js App Router pages and API routes
+  - `/api`: Backend API endpoints
+  - `/jobs`, `/storage`, etc.: Front-end pages
+- `/components`: Reusable React components
+  - `/ui`: shadcn/ui components
+- `/lib`: Core business logic
+  - `/backup`: Backup scheduling and execution
+  - `/db`: Database connectivity and models
+  - `/storage`: Storage provider integrations
+  - `/jobs`: Job workers for background processing
+
+### Core Subsystems
+
+#### Backup System
+The backup system uses a custom NodeScheduler built on node-schedule for reliable cron-based job scheduling. It spawns isolated child processes for job execution to prevent database locking issues. The scheduler maintains job state and provides retry mechanisms for failed jobs.
+
+#### Storage Providers
+The application supports multiple cloud storage providers:
+- AWS S3 compatible storage
+- Backblaze B2
+- Storj distributed storage
+
+Each provider has a standardized interface with specialized implementations for their unique APIs.
+
+#### Database Layer
+The database uses connection pooling with proper cleanup to handle concurrent access from the web UI and job workers. Migrations ensure proper schema updates over time.
+
+## UI Structure
+- Dashboard: Overview with stats and recent activity
+- Jobs: Manage backup jobs (create, edit, run, schedule)
+- Storage: Configure storage providers
+- Reports: View backup reports and analytics
+- Settings: Configure application settings
+- Notifications: Manage email notifications
+
+## Key Implementation Details
+
+### Job Scheduling
+Uses node-schedule with cron expressions for time-based scheduling. Jobs are persisted in SQLite and survive application restarts. The scheduler checks for missed jobs on startup.
+
+### Worker Processes
+Backup jobs run in isolated child processes to prevent database locking and improve reliability. Workers communicate completion status to the main process.
+
+### Database Connection Management
+Each process maintains its own database connection with proper locking mechanisms to prevent SQLITE_BUSY errors.
+
+### Error Handling
+The system implements comprehensive error handling with retry mechanisms and proper error reporting to the UI.
+
+### Cloud Storage Integration
+Storage providers are implemented through a provider-agnostic interface with specific adapters for each supported cloud service.
+
+## Development Workflow
+- `bun run dev`: Development mode
+- `bun run build`: Production build
+- `bun run start`: Run production build
+
+## Docker Support
+Designed to run in a single Docker container with proper signal handling for clean shutdowns and database persistence through volume mapping.

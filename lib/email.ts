@@ -7,32 +7,81 @@ interface EmailOptions {
   subject: string;
   text: string;
   html: string;
+  smtpConfig?: {
+    host: string;
+    port: number;
+    auth: {
+      user: string;
+      pass: string;
+    };
+    from: string;
+  };
 }
 
-export async function sendEmail(to: string, subject: string, body: string) {
+export async function sendEmail(options: EmailOptions): Promise<void>;
+export async function sendEmail(to: string, subject: string, body: string): Promise<void>;
+export async function sendEmail(...args: any[]): Promise<void> {
   try {
-    const db = getDatabase();
-    const smtpConfig = db.prepare("SELECT * FROM smtp_config ORDER BY id DESC LIMIT 1").get() as SMTPConfig | null;
+    let to: string, subject: string, html: string, smtpConfig: any;
 
-    if (!smtpConfig) {
+    // Check if first argument is an object (options pattern)
+    if (typeof args[0] === 'object') {
+      const options = args[0] as EmailOptions;
+      to = options.to;
+      subject = options.subject;
+      html = options.html;
+      
+      if (options.smtpConfig) {
+        // Use directly provided SMTP config
+        smtpConfig = {
+          host: options.smtpConfig.host,
+          port: options.smtpConfig.port,
+          secure: options.smtpConfig.port === 465,
+          auth: options.smtpConfig.auth
+        };
+        
+        const transporter = nodemailer.createTransport(smtpConfig);
+        
+        await transporter.sendMail({
+          from: options.smtpConfig.from,
+          to,
+          subject,
+          html,
+          text: options.text
+        });
+        
+        return;
+      }
+    } else {
+      // Traditional parameters
+      to = args[0];
+      subject = args[1];
+      html = args[2];
+    }
+
+    // Get SMTP config from database
+    const db = getDatabase();
+    const dbSmtpConfig = db.prepare("SELECT * FROM smtp_config ORDER BY id DESC LIMIT 1").get() as SMTPConfig | null;
+
+    if (!dbSmtpConfig) {
       throw new Error("SMTP configuration not found");
     }
 
     const transporter = nodemailer.createTransport({
-      host: smtpConfig.host,
-      port: smtpConfig.port,
-      secure: smtpConfig.port === 465,
+      host: dbSmtpConfig.host,
+      port: dbSmtpConfig.port,
+      secure: dbSmtpConfig.port === 465,
       auth: {
-        user: smtpConfig.username,
-        pass: smtpConfig.password,
+        user: dbSmtpConfig.username,
+        pass: dbSmtpConfig.password,
       },
     });
 
     await transporter.sendMail({
-      from: `"${smtpConfig.from_name}" <${smtpConfig.from_email}>`,
+      from: `"${dbSmtpConfig.from_name}" <${dbSmtpConfig.from_email}>`,
       to,
       subject,
-      html: body,
+      html,
     });
   } catch (error) {
     console.error("Error sending email:", error);

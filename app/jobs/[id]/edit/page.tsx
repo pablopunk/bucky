@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { ArrowLeft, Folder } from "lucide-react"
 
@@ -27,6 +25,8 @@ interface BackupJob {
   schedule: string
   remote_path: string
   status: string
+  next_run?: string | null
+  last_run?: string | null
 }
 
 export default function EditBackupJobPage({ params }: { params: { id: string } }) {
@@ -93,6 +93,7 @@ export default function EditBackupJobPage({ params }: { params: { id: string } }
           storageProviderId: storageProviderId,
           schedule: cronExpression,
           remotePath: remotePath,
+          notifications: true, // Always set notifications to true
         }),
       })
 
@@ -128,145 +129,129 @@ export default function EditBackupJobPage({ params }: { params: { id: string } }
           <h1 className="text-2xl font-bold tracking-tight">Edit Backup Job</h1>
         </div>
         <form onSubmit={handleSubmit}>
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="basic">Settings</TabsTrigger>
-              <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            </TabsList>
-            <TabsContent value="basic">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Job Settings</CardTitle>
-                  <CardDescription>Configure your backup job settings</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="job-name">Job Name</Label>
-                    <Input
-                      id="job-name"
-                      placeholder="My Backup Job"
-                      value={jobName}
-                      onChange={(e) => setJobName(e.target.value)}
-                      required
-                    />
+          <Card>
+            <CardHeader>
+              <CardTitle>Job Settings</CardTitle>
+              <CardDescription>Configure your backup job settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="job-name">Job Name</Label>
+                <Input
+                  id="job-name"
+                  placeholder="My Backup Job"
+                  value={jobName}
+                  onChange={(e) => setJobName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="source-path">Source Path</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="source-path"
+                    placeholder="/path/to/source"
+                    value={sourcePath}
+                    onChange={(e) => setSourcePath(e.target.value)}
+                    required
+                    className="flex-1"
+                  />
+                  <Button variant="outline" type="button">
+                    <Folder className="mr-2 h-4 w-4" />
+                    Browse
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="remote-path">Path on Remote</Label>
+                <Input
+                  id="remote-path"
+                  placeholder="/path/on/remote"
+                  value={remotePath}
+                  onChange={(e) => setRemotePath(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="storage-provider">Storage Provider</Label>
+                <Select value={storageProviderId} onValueChange={setStorageProviderId} required>
+                  <SelectTrigger id="storage-provider">
+                    <SelectValue placeholder="Select a storage provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providers.map((provider: StorageProvider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.name} ({provider.type.toUpperCase()})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 pt-4 border-t">
+                <Label htmlFor="cron-expression">Schedule (Cron Expression)</Label>
+                <Input
+                  id="cron-expression"
+                  placeholder="0 0 * * *"
+                  value={cronExpression}
+                  onChange={(e) => setCronExpression(e.target.value)}
+                  required
+                />
+                <p className="text-sm text-muted-foreground">
+                  Format: minute hour day month weekday
+                </p>
+                <div className="mt-2">
+                  <p className="text-sm font-medium mb-2">Common schedules:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCronExpression("0 * * * *")}
+                    >
+                      Hourly
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCronExpression("0 */2 * * *")}
+                    >
+                      Every 2 hours
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCronExpression("0 0 * * *")}
+                    >
+                      Daily (midnight)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCronExpression("0 0 * * 0")}
+                    >
+                      Weekly (Sunday)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCronExpression("0 0 1 * *")}
+                    >
+                      Monthly (1st)
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="source-path">Source Path</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="source-path"
-                        placeholder="/path/to/source"
-                        value={sourcePath}
-                        onChange={(e) => setSourcePath(e.target.value)}
-                        required
-                        className="flex-1"
-                      />
-                      <Button variant="outline" type="button">
-                        <Folder className="mr-2 h-4 w-4" />
-                        Browse
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="remote-path">Path on Remote</Label>
-                    <Input
-                      id="remote-path"
-                      placeholder="/path/on/remote"
-                      value={remotePath}
-                      onChange={(e) => setRemotePath(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="storage-provider">Storage Provider</Label>
-                    <Select value={storageProviderId} onValueChange={setStorageProviderId} required>
-                      <SelectTrigger id="storage-provider">
-                        <SelectValue placeholder="Select a storage provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {providers.map((provider: StorageProvider) => (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            {provider.name} ({provider.type.toUpperCase()})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label htmlFor="cron-expression">Schedule (Cron Expression)</Label>
-                    <Input
-                      id="cron-expression"
-                      placeholder="0 0 * * *"
-                      value={cronExpression}
-                      onChange={(e) => setCronExpression(e.target.value)}
-                      required
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Format: minute hour day month weekday
-                    </p>
-                    <div className="mt-2">
-                      <p className="text-sm font-medium mb-2">Common schedules:</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCronExpression("0 * * * *")}
-                        >
-                          Hourly
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCronExpression("0 */2 * * *")}
-                        >
-                          Every 2 hours
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCronExpression("0 0 * * *")}
-                        >
-                          Daily (midnight)
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCronExpression("0 0 * * 0")}
-                        >
-                          Weekly (Sunday)
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCronExpression("0 0 1 * *")}
-                        >
-                          Monthly (1st)
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="notifications">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notifications</CardTitle>
-                  <CardDescription>Configure email notifications for your backup job</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Email notifications are not yet supported.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                </div>
+              </div>
+              <div className="space-y-2 pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Email notifications are enabled by default for this backup job.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
           <div className="mt-4 flex justify-end gap-2">
             <Link href="/jobs">
               <Button variant="outline">Cancel</Button>

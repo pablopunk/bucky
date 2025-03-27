@@ -59,6 +59,7 @@ export interface BackupJob {
   status: "active" | "paused" | "failed" | "in_progress";
   next_run: string | null;
   last_run: string | null;
+  notifications: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -136,6 +137,7 @@ CREATE TABLE IF NOT EXISTS backup_jobs (
   status TEXT NOT NULL DEFAULT 'active',
   next_run DATETIME,
   last_run DATETIME,
+  notifications BOOLEAN DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (storage_provider_id) REFERENCES storage_providers (id)

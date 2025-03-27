@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createBackupJob, getBackupJob, getDatabase } from "@/lib/db";
-import { BackupScheduler } from "@/lib/backup/scheduler";
+import { getBreeScheduler } from "@/lib/backup";
 import { StorageProviderManager } from "@/lib/storage";
 import { z } from "zod";
 import type { BackupJob } from "@/lib/db";
@@ -10,9 +10,11 @@ const backupJobSchema = z.object({
   sourcePath: z.string().min(1),
   storageProviderId: z.string().min(1),
   schedule: z.string().min(1),
+  remotePath: z.string().min(1),
   retentionPeriod: z.number().min(1).optional(),
   compressionEnabled: z.boolean().optional().default(true),
   compressionLevel: z.number().min(0).max(9).default(6),
+  notifications: z.boolean().optional().default(true),
 });
 
 export async function POST(request: Request) {
@@ -62,7 +64,8 @@ export async function POST(request: Request) {
     }
 
     if (action === "run") {
-      const scheduler = new BackupScheduler(new StorageProviderManager());
+      // Use the Bree scheduler for running jobs
+      const scheduler = getBreeScheduler();
       const job = getBackupJob(jobId);
       if (!job) {
         return NextResponse.json(
@@ -71,7 +74,16 @@ export async function POST(request: Request) {
         );
       }
 
-      await scheduler.runJob(job);
+      // Update job status to in_progress
+      db.prepare(
+        `UPDATE backup_jobs 
+         SET status = 'in_progress', 
+             updated_at = ?
+         WHERE id = ?`
+      ).run(Date.now(), jobId);
+
+      // Run the job with Bree
+      await scheduler.runJobNow(jobId);
       return NextResponse.json({ success: true });
     }
 
@@ -96,20 +108,22 @@ export async function POST(request: Request) {
       source_path: validatedData.sourcePath,
       storage_provider_id: validatedData.storageProviderId,
       schedule: validatedData.schedule,
+      remote_path: validatedData.remotePath,
       retention_period: validatedData.retentionPeriod || null,
       compression_enabled: validatedData.compressionEnabled,
       compression_level: validatedData.compressionLevel,
       status: "active" as const,
       next_run: null,
-      last_run: null,
+      last_run: null
     });
 
-    // Schedule the job
-    const scheduler = new BackupScheduler(new StorageProviderManager());
-    const job = getBackupJob(newJobId);
-    if (job) {
-      await scheduler.scheduleJob(job);
-    }
+    // Schedule the job using the Bree scheduler
+    const scheduler = getBreeScheduler();
+    
+    // Reload jobs in the scheduler to pick up the new job
+    await scheduler.loadJobs();
+    
+    console.log(`New job ${newJobId} created and scheduler reloaded`);
 
     return NextResponse.json({ id: newJobId });
   } catch (error) {
@@ -159,11 +173,15 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const scheduler = new BackupScheduler(new StorageProviderManager());
-    scheduler.cancelJob(id);
-
+    // Delete the job from the database
     const db = getDatabase();
     db.prepare(`DELETE FROM backup_jobs WHERE id = ?`).run(id);
+    
+    // Reload jobs in the scheduler to remove the deleted job
+    const scheduler = getBreeScheduler();
+    await scheduler.loadJobs();
+    
+    console.log(`Job ${id} deleted and scheduler reloaded`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

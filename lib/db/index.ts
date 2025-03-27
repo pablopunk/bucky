@@ -2,46 +2,99 @@ import Database from "better-sqlite3"
 import path from "path"
 import { schema } from "./schema"
 import { runMigrations } from "./migrations"
+import fs from "fs"
 
-let db: Database.Database | null = null
+// Cache for database connections
+const connections = new Map<number, Database.Database>()
+let schemaInitialized = false
 
+// Get or create a database connection for the current thread/process
 export function getDatabase(): Database.Database {
-  if (!db) {
+  // Get unique identifier for the current thread/process
+  const threadId = process.pid || 1
+
+  if (!connections.has(threadId)) {
+    console.log(`Creating new database connection for thread/process ${threadId}`)
+    
     // Ensure data directory exists
     const dataDir = path.join(process.cwd(), "data")
-    const fs = require("fs")
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true })
     }
 
     // Initialize database
     const dbPath = path.join(dataDir, "bucky.db")
-    db = new Database(dbPath)
+    const db = new Database(dbPath, {
+      // Set busy timeout to handle concurrent access
+      timeout: 5000, // 5 second timeout
+      // Use WAL mode for better concurrency
+      verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
+    })
+    
+    // Enable WAL mode for better concurrency
     db.pragma("journal_mode = WAL")
-
-    // Initialize schema - execute as a single transaction
-    db.exec(schema)
-
-    // Run migrations
-    try {
-      db.prepare(`
-        ALTER TABLE backup_jobs
-        ADD COLUMN remote_path TEXT NOT NULL DEFAULT '/'
-      `).run()
-      console.log("Added remote_path column to backup_jobs table")
-    } catch (error) {
-      // Column might already exist, which is fine
-      console.log("remote_path column might already exist")
+    
+    // Set busy timeout
+    db.pragma("busy_timeout = 5000")
+    
+    // Enable foreign keys
+    db.pragma("foreign_keys = ON")
+    
+    // Cache connection
+    connections.set(threadId, db)
+    
+    // Initialize schema only once
+    if (!schemaInitialized) {
+      try {
+        // Check if the schema needs to be initialized
+        const tableCount = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table'").get() as { count: number }
+        
+        if (tableCount.count === 0) {
+          console.log("Initializing database schema...")
+          // Initialize schema - execute as a single transaction
+          db.exec(schema)
+          schemaInitialized = true
+        }
+        
+        // Run migrations for schema updates
+        runMigrations()
+      } catch (error) {
+        console.error("Error initializing database:", error)
+      }
     }
   }
-  return db
+  
+  return connections.get(threadId)!
 }
 
-export function closeDatabase() {
-  if (db) {
-    db.close()
-    db = null
+// Close database connection for the current thread
+export function closeDatabase(): void {
+  const threadId = process.pid || 1
+  
+  if (connections.has(threadId)) {
+    try {
+      const db = connections.get(threadId)!
+      db.close()
+      connections.delete(threadId)
+      console.log(`Closed database connection for thread/process ${threadId}`)
+    } catch (error) {
+      console.error(`Error closing database connection for thread/process ${threadId}:`, error)
+    }
   }
+}
+
+// Close all database connections
+export function closeAllDatabases(): void {
+  for (const [threadId, db] of connections.entries()) {
+    try {
+      db.close()
+      console.log(`Closed database connection for thread/process ${threadId}`)
+    } catch (error) {
+      console.error(`Error closing database connection for thread/process ${threadId}:`, error)
+    }
+  }
+  
+  connections.clear()
 }
 
 // Helper functions for common database operations
@@ -203,8 +256,8 @@ export function createBackupJob(data: Omit<BackupJob, "id" | "created_at" | "upd
     `INSERT INTO backup_jobs (
       id, name, source_path, storage_provider_id, schedule,
       retention_period, compression_enabled, compression_level, status,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      next_run, last_run, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     data.name,
@@ -215,6 +268,8 @@ export function createBackupJob(data: Omit<BackupJob, "id" | "created_at" | "upd
     data.compression_enabled ? 1 : 0,
     data.compression_level,
     data.status,
+    data.next_run || null,
+    data.last_run || null,
     now,
     now
   )

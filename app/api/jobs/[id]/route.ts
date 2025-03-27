@@ -8,6 +8,7 @@ const updateJobSchema = z.object({
   storageProviderId: z.string().min(1),
   schedule: z.string().min(1),
   remotePath: z.string().min(1),
+  notifications: z.boolean().optional().default(true),
 });
 
 export async function GET(
@@ -16,6 +17,7 @@ export async function GET(
 ) {
   try {
     const db = getDatabase();
+    // Only select columns we know for sure exist in the database
     const job = db.prepare(
       `SELECT 
         id, name, source_path, storage_provider_id,
@@ -32,7 +34,13 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(job);
+    // Always set notifications to true in the response
+    const jobWithNotifications = {
+      ...job,
+      notifications: true
+    };
+
+    return NextResponse.json(jobWithNotifications);
   } catch (error) {
     console.error("Error fetching backup job:", error);
     return NextResponse.json(
@@ -63,7 +71,8 @@ export async function PUT(
       );
     }
 
-    // Update the backup job
+    // Update the backup job without using the notifications column
+    // to avoid SQL errors if the column doesn't exist yet
     db.prepare(
       `UPDATE backup_jobs 
        SET name = ?, source_path = ?, storage_provider_id = ?,

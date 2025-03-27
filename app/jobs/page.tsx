@@ -11,17 +11,17 @@ import { toast } from "sonner"
 interface BackupJob {
   id: string
   name: string
-  sourcePath: string
-  destinationProvider: string
+  source_path: string
+  storage_provider_id: string
   schedule: string
-  retentionDays: number
-  compression: boolean
-  encryption: boolean
+  retention_period?: number
+  compression_enabled?: boolean
+  compression_level?: number
   status: "active" | "in_progress" | "failed"
-  lastRun?: string
-  nextRun?: string
-  createdAt: string
-  updatedAt: string
+  last_run?: string
+  next_run?: string
+  created_at: string
+  updated_at: string
 }
 
 interface BackupHistory {
@@ -97,6 +97,7 @@ export default function JobsPage() {
         throw new Error("Failed to fetch backup jobs")
       }
       const data = await response.json()
+      console.log("Jobs data from API:", data)
       setJobs(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
@@ -214,12 +215,18 @@ export default function JobsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Backup Jobs</h1>
             <p className="text-muted-foreground">Manage your automated backup jobs</p>
           </div>
-          <Link href="/jobs/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Job
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { fetchJobs(); fetchHistory(); }}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
             </Button>
-          </Link>
+            <Link href="/jobs/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Job
+              </Button>
+            </Link>
+          </div>
         </div>
         <Card>
           <CardHeader>
@@ -243,7 +250,7 @@ export default function JobsPage() {
                 {jobs.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell className="font-medium">{job.name}</TableCell>
-                    <TableCell>{job.sourcePath}</TableCell>
+                    <TableCell>{job.source_path}</TableCell>
                     <TableCell>{job.schedule}</TableCell>
                     <TableCell>
                       <div className="flex items-center">
@@ -259,8 +266,8 @@ export default function JobsPage() {
                         {job.status.charAt(0).toUpperCase() + job.status.slice(1).replace("_", " ")}
                       </div>
                     </TableCell>
-                    <TableCell>{job.lastRun ? new Date(job.lastRun).toLocaleString() : "Never"}</TableCell>
-                    <TableCell>{job.nextRun ? new Date(job.nextRun).toLocaleString() : "Not scheduled"}</TableCell>
+                    <TableCell>{job.last_run ? new Date(job.last_run).toLocaleString() : "Never"}</TableCell>
+                    <TableCell>{job.next_run ? new Date(job.next_run).toLocaleString() : "Not scheduled"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {isInProgress(job.status) ? (

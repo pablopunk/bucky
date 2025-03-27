@@ -173,6 +173,9 @@ export default function NotificationsPage() {
                   }
                   placeholder="smtp.example.com"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Common servers: smtp.gmail.com, smtp.office365.com, smtp.mail.yahoo.com
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="port">SMTP Port</Label>
@@ -187,6 +190,9 @@ export default function NotificationsPage() {
                     }))
                   }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Common ports: 587 (TLS), 465 (SSL), 25 (unsecured)
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
@@ -246,9 +252,17 @@ export default function NotificationsPage() {
               </div>
               <div className="flex gap-2">
                 <Button onClick={saveSMTPConfig}>Save Configuration</Button>
-                <Button variant="outline" onClick={testEmailConnection}>
+                <Button 
+                  variant="outline" 
+                  onClick={testEmailConnection} 
+                  disabled={!smtpConfig.host || !smtpConfig.port || !smtpConfig.username || !smtpConfig.password || !smtpConfig.fromEmail}
+                >
                   Test Connection
                 </Button>
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                <p>For Gmail, you may need to use an App Password if 2FA is enabled. <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noopener noreferrer" className="underline">Learn more</a>.</p>
+                <p>A test email will be sent to the "From Email" address when testing the connection.</p>
               </div>
             </CardContent>
           </Card>
