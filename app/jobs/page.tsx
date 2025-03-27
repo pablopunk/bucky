@@ -5,8 +5,14 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, RefreshCw, Trash, Edit, StopCircle } from "lucide-react"
+import { Plus, RefreshCw, Trash, Edit, StopCircle, PauseCircle, PlayCircle } from "lucide-react"
 import { toast } from "sonner"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface BackupJob {
   id: string
@@ -17,7 +23,7 @@ interface BackupJob {
   retention_period?: number
   compression_enabled?: boolean
   compression_level?: number
-  status: "active" | "in_progress" | "failed"
+  status: "active" | "paused" | "in_progress" | "failed"
   last_run?: string
   next_run?: string
   created_at: string
@@ -39,6 +45,10 @@ interface BackupHistory {
 // Add a type guard function
 function isInProgress(status: BackupJob['status']): status is "in_progress" {
   return status === "in_progress";
+}
+
+function isPaused(status: BackupJob['status']): status is "paused" {
+  return status === "paused";
 }
 
 export default function JobsPage() {
@@ -199,6 +209,52 @@ export default function JobsPage() {
     }
   };
 
+  const pauseJob = async (id: string) => {
+    try {
+      const response = await fetch(`/api/jobs?id=${id}&action=pause`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to pause backup job");
+      }
+
+      // Fetch latest data
+      await fetchJobs();
+      
+      toast.success("Backup job paused successfully");
+    } catch (error) {
+      console.error("Failed to pause backup job:", error);
+      toast.error("Failed to pause backup job");
+      
+      // Fetch jobs to ensure UI is in sync
+      await fetchJobs();
+    }
+  };
+
+  const resumeJob = async (id: string) => {
+    try {
+      const response = await fetch(`/api/jobs?id=${id}&action=resume`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to resume backup job");
+      }
+
+      // Fetch latest data
+      await fetchJobs();
+      
+      toast.success("Backup job resumed successfully");
+    } catch (error) {
+      console.error("Failed to resume backup job:", error);
+      toast.error("Failed to resume backup job");
+      
+      // Fetch jobs to ensure UI is in sync
+      await fetchJobs();
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>
   }
@@ -260,6 +316,8 @@ export default function JobsPage() {
                               ? "bg-green-500"
                               : job.status === "in_progress"
                               ? "bg-yellow-500"
+                              : job.status === "paused"
+                              ? "bg-blue-500"
                               : "bg-red-500"
                           }`}
                         />
@@ -271,35 +329,109 @@ export default function JobsPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {isInProgress(job.status) ? (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => stopJob(job.id)}
-                          >
-                            <StopCircle className="h-4 w-4 text-red-500" />
-                          </Button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => stopJob(job.id)}
+                                >
+                                  <StopCircle className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Stop backup job</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : isPaused(job.status) ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => resumeJob(job.id)}
+                                >
+                                  <PlayCircle className="h-4 w-4 text-green-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Resume backup job</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => runJob(job.id)}
-                            disabled={isInProgress(job.status)}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => runJob(job.id)}
+                                    disabled={isInProgress(job.status)}
+                                  >
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Run backup job now</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => pauseJob(job.id)}
+                                  >
+                                    <PauseCircle className="h-4 w-4 text-blue-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Pause backup job</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </>
                         )}
-                        <Link href={`/jobs/${job.id}/edit`}>
-                          <Button variant="outline" size="icon">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => deleteJob(job.id)}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link href={`/jobs/${job.id}/edit`}>
+                                <Button variant="outline" size="icon">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Edit backup job</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => deleteJob(job.id)}
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete backup job</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </TableCell>
                   </TableRow>

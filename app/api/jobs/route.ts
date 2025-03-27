@@ -32,6 +32,34 @@ export async function POST(request: Request) {
 
     const db = getDatabase();
 
+    if (action === "pause") {
+      // Update the job status to paused
+      db.prepare(
+        `UPDATE backup_jobs 
+         SET status = 'paused', 
+             updated_at = ?
+         WHERE id = ?`
+      ).run(new Date().toISOString(), jobId);
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "resume") {
+      // Update the job status back to active
+      db.prepare(
+        `UPDATE backup_jobs 
+         SET status = 'active', 
+             updated_at = ?
+         WHERE id = ?`
+      ).run(new Date().toISOString(), jobId);
+
+      // Reload the scheduler to ensure the job gets properly scheduled
+      const scheduler = getBreeScheduler();
+      await scheduler.loadJobs();
+
+      return NextResponse.json({ success: true });
+    }
+
     if (action === "stop") {
       db.prepare(
         `UPDATE backup_jobs 
@@ -80,7 +108,7 @@ export async function POST(request: Request) {
          SET status = 'in_progress', 
              updated_at = ?
          WHERE id = ?`
-      ).run(Date.now(), jobId);
+      ).run(new Date().toISOString(), jobId);
 
       // Run the job with Bree
       await scheduler.runJobNow(jobId);

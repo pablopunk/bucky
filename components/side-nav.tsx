@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { BarChart, Clock, Cloud, FileArchive, Home, Mail, Settings } from "lucide-react"
+import { BarChart, Cloud, FileArchive, Home, Mail, Settings } from "lucide-react"
 
 const navItems = [
   {
@@ -16,11 +16,6 @@ const navItems = [
     title: "Backup Jobs",
     href: "/jobs",
     icon: FileArchive,
-  },
-  {
-    title: "Schedule",
-    href: "/schedule",
-    icon: Clock,
   },
   {
     title: "Storage",

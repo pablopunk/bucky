@@ -256,7 +256,7 @@ export class BreeScheduler {
       db = getDatabase();
       const jobs = db.prepare(`
         SELECT * FROM backup_jobs 
-        WHERE status != 'disabled' AND schedule IS NOT NULL
+        WHERE status = 'active' AND schedule IS NOT NULL
       `).all() as BackupJob[];
 
       console.log(`Found ${jobs.length} active backup jobs`);
@@ -280,7 +280,7 @@ export class BreeScheduler {
           // Update next_run time in database
           db.prepare(`
             UPDATE backup_jobs SET next_run = ? WHERE id = ?
-          `).run(nextRun.getTime(), job.id);
+          `).run(nextRun.toISOString(), job.id);
           
           console.log(`Job ${job.id} (${job.name}) scheduled for ${nextRun}`);
           
@@ -306,9 +306,14 @@ export class BreeScheduler {
           // Mark job as failed due to invalid schedule
           db.prepare(`
             UPDATE backup_jobs SET status = ?, updated_at = ? WHERE id = ?
-          `).run('failed', Date.now(), job.id);
+          `).run('failed', new Date().toISOString(), job.id);
         }
       }
+      
+      // For paused jobs, explicitly set next_run to null
+      db.prepare(`
+        UPDATE backup_jobs SET next_run = NULL WHERE status = 'paused'
+      `).run();
       
       // Update Bree's job array - remove all jobs first then add new definitions
       this.bree.remove();
