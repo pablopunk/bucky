@@ -20,8 +20,7 @@ interface SMTPConfig {
 interface NotificationSettings {
   onSuccess: boolean
   onFailure: boolean
-  onQuotaWarning: boolean
-  quotaThreshold: number
+  email: string
 }
 
 export default function NotificationsPage() {
@@ -37,8 +36,7 @@ export default function NotificationsPage() {
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     onSuccess: true,
     onFailure: true,
-    onQuotaWarning: true,
-    quotaThreshold: 90,
+    email: "",
   })
 
   const [loading, setLoading] = useState(true)
@@ -307,36 +305,19 @@ export default function NotificationsPage() {
                   }
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Storage Quota Warnings</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications when storage quota is near limit
-                  </p>
-                </div>
-                <Switch
-                  checked={notificationSettings.onQuotaWarning}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings((prev) => ({
-                      ...prev,
-                      onQuotaWarning: checked,
-                    }))
-                  }
-                />
-              </div>
               <div className="space-y-2">
-                <Label>Quota Warning Threshold (%)</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={notificationSettings.quotaThreshold}
+                  id="email"
+                  type="email"
+                  value={notificationSettings.email}
                   onChange={(e) =>
                     setNotificationSettings((prev) => ({
                       ...prev,
-                      quotaThreshold: parseInt(e.target.value),
+                      email: e.target.value,
                     }))
                   }
+                  placeholder="user@example.com"
                 />
               </div>
               <Button onClick={saveNotificationSettings}>Save Settings</Button>

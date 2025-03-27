@@ -168,10 +168,9 @@ export interface SMTPConfig {
 
 export interface NotificationSettings {
   id: string
+  email: string
   on_success: boolean
   on_failure: boolean
-  on_quota_warning: boolean
-  quota_threshold: number
   created_at: string
   updated_at: string
 }

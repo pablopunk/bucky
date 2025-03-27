@@ -16,7 +16,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const id = (await params).id;
     const db = getDatabase();
+    
     // Only select columns we know for sure exist in the database
     const job = db.prepare(
       `SELECT 
@@ -25,7 +27,7 @@ export async function GET(
         created_at, updated_at
       FROM backup_jobs
       WHERE id = ?`
-    ).get(params.id);
+    ).get(id);
 
     if (!job) {
       return NextResponse.json(
@@ -55,6 +57,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const id = (await params).id;
     const body = await request.json();
     const validatedData = updateJobSchema.parse(body);
 
@@ -85,7 +88,7 @@ export async function PUT(
       validatedData.schedule,
       validatedData.remotePath,
       new Date().toISOString(),
-      params.id
+      id
     );
 
     return NextResponse.json({ success: true });

@@ -243,7 +243,7 @@ export default function DashboardPage() {
                           <p className="text-sm font-medium">{provider.name}</p>
                           <p className="text-xs text-muted-foreground capitalize">{provider.type}</p>
                         </div>
-                        <Link href={`/storage/${provider.id}`}>
+                        <Link href={`/storage`}>
                           <Button variant="ghost" size="sm">View</Button>
                         </Link>
                       </div>

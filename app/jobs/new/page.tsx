@@ -125,7 +125,7 @@ export default function NewBackupJobPage() {
         sourcePath,
         storageProviderId,
         schedule: cronExpression,
-        remotePath,
+        remotePath: remotePath || '/',
       })
       toast.success("Backup job created successfully")
       router.push("/jobs")
@@ -194,11 +194,14 @@ export default function NewBackupJobPage() {
                 <Label htmlFor="remote-path">Path on Remote</Label>
                 <Input
                   id="remote-path"
-                  placeholder="/path/on/remote"
+                  placeholder="/"
                   value={remotePath}
                   onChange={(e) => setRemotePath(e.target.value)}
                   required
                 />
+                <p className="text-sm text-muted-foreground">
+                  Required path on the remote storage where files will be backed up. Use '/' for the root directory.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="storage-provider">Storage Provider</Label>

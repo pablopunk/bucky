@@ -17,38 +17,41 @@ export class BreeScheduler {
   private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.bree = new Bree({
+    // Create a configuration object that's compatible with TypeScript
+    const breeConfig: any = {
       root: join(process.cwd(), 'lib/jobs'),
       jobs: [], // Will be populated on start
-      // Register Bree dependencies
-      register: [join(process.cwd(), 'lib/jobs/register.js')],
       // Worker configuration
       worker: {
         workerData: {
           // Shared data for all workers
           appRoot: process.cwd()
         }
-      },
-      // Error handler
-      errorHandler: (error, workerMetadata) => {
-        console.error(`Bree error handler:`, error);
-      },
-      // Message handler
-      workerMessageHandler: (message, workerMetadata) => {
-        const { name } = workerMetadata;
-        const jobId = name.replace('backup-', '');
-        console.log(`Worker message for job ${jobId}:`, message);
-        
-        if (message === 'done' || message === 'error') {
-          this.jobsMap.delete(jobId);
-          // Process next job in queue
-          this.processJobQueue();
-        }
       }
+    };
+    
+    // Add register property conditionally to avoid TypeScript errors
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Adding register worker script for development mode');
+      breeConfig.register = [join(process.cwd(), 'lib/jobs/register.js')];
+    }
+    
+    this.bree = new Bree(breeConfig);
+    
+    // Error handler
+    this.bree.on('worker created', (name) => {
+      console.log(`Worker created for job ${name}`);
     });
 
     // Error handler
     this.bree.on('worker error', (error, workerMetadata) => {
+      if (!workerMetadata || !workerMetadata.name) {
+        console.error(`Worker error, but no metadata available:`, error);
+        // Process next job in queue even if we don't know which job errored
+        this.processJobQueue();
+        return;
+      }
+      
       const { name } = workerMetadata;
       const jobId = name.replace('backup-', '');
       console.error(`Worker error in job ${jobId}:`, error);
@@ -56,6 +59,25 @@ export class BreeScheduler {
       
       // Process next job in queue
       this.processJobQueue();
+    });
+    
+    // Message handler
+    this.bree.on('worker message', (name, message) => {
+      if (!name) {
+        console.log(`Worker message received, but no name available:`, message);
+        // Process next job in queue even if we don't know which job finished
+        this.processJobQueue();
+        return;
+      }
+      
+      const jobId = name.replace('backup-', '');
+      console.log(`Worker message for job ${jobId}:`, message);
+      
+      if (message === 'done' || message === 'error') {
+        this.jobsMap.delete(jobId);
+        // Process next job in queue
+        this.processJobQueue();
+      }
     });
   }
 

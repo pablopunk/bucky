@@ -3,6 +3,11 @@ description:
 globs: 
 alwaysApply: true
 ---
+---
+description: 
+globs: 
+alwaysApply: true
+---
 # Bucky Backup Manager Architecture
 
 ## Tech Stack Overview
@@ -17,6 +22,7 @@ alwaysApply: true
 - **Notifications**: Sonner for toast notifications
 - **Scheduling**: node-schedule for job scheduling
 - **Storage Providers**: AWS S3, Backblaze B2, Storj integration
+- **Logging**: File-based logging system with UI viewer
 
 ## Core Architecture
 
@@ -34,7 +40,10 @@ The application uses SQLite with the following core tables:
 ### File Organization
 - `/app`: Next.js App Router pages and API routes
   - `/api`: Backend API endpoints
-  - `/jobs`, `/storage`, etc.: Front-end pages
+    - `/api/jobs`: Job management endpoints
+    - `/api/storage`: Storage provider endpoints
+    - `/api/logs`: Log retrieval and download endpoints
+  - `/jobs`, `/storage`, `/logs`: Front-end pages
 - `/components`: Reusable React components
   - `/ui`: shadcn/ui components
 - `/lib`: Core business logic
@@ -42,6 +51,7 @@ The application uses SQLite with the following core tables:
   - `/db`: Database connectivity and models
   - `/storage`: Storage provider integrations
   - `/jobs`: Job workers for background processing
+  - `/logger`: Centralized logging functionality
 
 ### Core Subsystems
 
@@ -59,11 +69,14 @@ Each provider has a standardized interface with specialized implementations for 
 #### Database Layer
 The database uses connection pooling with proper cleanup to handle concurrent access from the web UI and job workers. Migrations ensure proper schema updates over time.
 
+#### Logging System
+The application uses a centralized logging system that writes to date-based log files. Component-specific loggers (jobs, storage, API) generate separate log files for easier troubleshooting. The Logs UI allows viewing and downloading these log files.
+
 ## UI Structure
 - Dashboard: Overview with stats and recent activity
 - Jobs: Manage backup jobs (create, edit, run, schedule)
 - Storage: Configure storage providers
-- Reports: View backup reports and analytics
+- Logs: View application and job logs with download capability
 - Settings: Configure application settings
 - Notifications: Manage email notifications
 
@@ -73,16 +86,19 @@ The database uses connection pooling with proper cleanup to handle concurrent ac
 Uses node-schedule with cron expressions for time-based scheduling. Jobs are persisted in SQLite and survive application restarts. The scheduler checks for missed jobs on startup.
 
 ### Worker Processes
-Backup jobs run in isolated child processes to prevent database locking and improve reliability. Workers communicate completion status to the main process.
+Backup jobs run in isolated child processes to prevent database locking and improve reliability. Workers create their own database connections and communicate completion status to the main process. The worker script is self-contained to avoid module loading issues.
 
 ### Database Connection Management
 Each process maintains its own database connection with proper locking mechanisms to prevent SQLITE_BUSY errors.
 
 ### Error Handling
-The system implements comprehensive error handling with retry mechanisms and proper error reporting to the UI.
+The system implements comprehensive error handling with retry mechanisms and proper error reporting to the UI and log files.
 
 ### Cloud Storage Integration
 Storage providers are implemented through a provider-agnostic interface with specific adapters for each supported cloud service.
+
+### Logging
+Logs are stored in the `/logs` directory with daily rotation and component-specific files. The UI displays the most recent 1000 lines while providing an option to download complete log files.
 
 ## Development Workflow
 - `bun run dev`: Development mode

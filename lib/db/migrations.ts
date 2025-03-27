@@ -47,6 +47,22 @@ export function runMigrations() {
       db.exec(`ALTER TABLE backup_jobs ADD COLUMN compression_level INTEGER NOT NULL DEFAULT 6;`);
     }
     
+    // Run migration for notification_settings if the email column doesn't exist
+    const hasEmailColumn = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('notification_settings') WHERE name='email'`).get() as ColumnResult;
+    if (hasEmailColumn.count === 0) {
+      console.log('Running migration to update notification_settings table structure');
+      
+      // Run the notification_settings table migration
+      const migration = migrations.find(m => m.name === "update_notification_settings_table");
+      if (migration) {
+        console.log(`Executing migration: ${migration.name}`);
+        db.exec(migration.sql);
+        console.log(`Migration completed: ${migration.name}`);
+      }
+    } else {
+      console.log('Notification settings table already has email column, skipping migration');
+    }
+    
     // Commit transaction
     db.exec('COMMIT;');
     console.log('Database migrations completed successfully');
@@ -56,4 +72,34 @@ export function runMigrations() {
     console.error('Error during database migrations:', error);
     throw error;
   }
-} 
+}
+
+// Add a migration to alter notification_settings table
+export const migrations = [
+  // Migration to fix the notification_settings table
+  {
+    name: "update_notification_settings_table",
+    sql: `
+      -- Create a backup of the old table
+      CREATE TABLE IF NOT EXISTS notification_settings_backup (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        on_success BOOLEAN DEFAULT 1,
+        on_failure BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Copy existing data (only on_success and on_failure columns)
+      INSERT INTO notification_settings_backup (id, email, on_success, on_failure, created_at, updated_at)
+      SELECT id, '' as email, on_success, on_failure, created_at, updated_at
+      FROM notification_settings;
+
+      -- Drop the old table
+      DROP TABLE notification_settings;
+
+      -- Rename the backup table to the original name
+      ALTER TABLE notification_settings_backup RENAME TO notification_settings;
+    `
+  }
+]; 

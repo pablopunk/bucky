@@ -66,7 +66,8 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
 
   const fetchJob = async () => {
     try {
-      const response = await fetch(`/api/jobs/${params.id}`)
+      const id = (await params).id;
+      const response = await fetch(`/api/jobs/${id}`)
       if (!response.ok) {
         throw new Error("Failed to fetch backup job")
       }
@@ -81,7 +82,8 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
 
   const fetchJobHistory = async () => {
     try {
-      const response = await fetch(`/api/backup-history?jobId=${params.id}`)
+      const id = (await params).id;
+      const response = await fetch(`/api/backup-history?jobId=${id}`)
       if (!response.ok) {
         throw new Error("Failed to fetch backup history")
       }
@@ -94,7 +96,8 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
 
   const runJob = async () => {
     try {
-      const response = await fetch(`/api/jobs?id=${params.id}&action=run`, {
+      const id = (await params).id;
+      const response = await fetch(`/api/jobs?id=${id}&action=run`, {
         method: "POST",
       })
 
@@ -114,7 +117,8 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
 
   const stopJob = async () => {
     try {
-      const response = await fetch(`/api/jobs?id=${params.id}&action=stop`, {
+      const id = (await params).id;
+      const response = await fetch(`/api/jobs?id=${id}&action=stop`, {
         method: "POST",
       })
 
@@ -138,7 +142,8 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
     }
 
     try {
-      const response = await fetch(`/api/jobs?id=${params.id}`, {
+      const id = (await params).id;
+      const response = await fetch(`/api/jobs?id=${id}`, {
         method: "DELETE",
       })
 

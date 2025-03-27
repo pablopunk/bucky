@@ -179,8 +179,6 @@ CREATE TABLE IF NOT EXISTS notification_settings (
   email TEXT NOT NULL,
   on_success BOOLEAN DEFAULT 1,
   on_failure BOOLEAN DEFAULT 1,
-  on_quota_warning BOOLEAN DEFAULT 1,
-  quota_threshold INTEGER DEFAULT 90,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

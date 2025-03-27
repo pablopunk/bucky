@@ -33,8 +33,8 @@ const navItems = [
     icon: Mail,
   },
   {
-    title: "Reports",
-    href: "/reports",
+    title: "Logs",
+    href: "/logs",
     icon: BarChart,
   },
   {

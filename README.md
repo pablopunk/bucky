@@ -1,5 +1,8 @@
 # Bucky - Backup Manager
 
+> [!WARNING]  
+> This software is on a very early alpha stage, do NOT use it for critical data
+
 Bucky is a modern, easy-to-use backup manager that helps you automate and manage your backups across multiple storage providers. Built with Next.js and Bun, it provides a beautiful UI for managing your backup jobs and monitoring their status.
 
 ## Features
