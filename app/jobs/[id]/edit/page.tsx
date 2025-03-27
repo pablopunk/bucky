@@ -63,7 +63,8 @@ export default function EditBackupJobPage({ params }: { params: { id: string } }
 
   const fetchJob = async () => {
     try {
-      const response = await fetch(`/api/jobs/${params.id}`)
+      const id = (await params).id
+      const response = await fetch(`/api/jobs/${id}`)
       if (!response.ok) {
         throw new Error("Failed to fetch backup job")
       }
@@ -83,8 +84,9 @@ export default function EditBackupJobPage({ params }: { params: { id: string } }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const id = (await params).id
     try {
-      const response = await fetch(`/api/jobs/${params.id}`, {
+      const response = await fetch(`/api/jobs/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
