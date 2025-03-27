@@ -8,7 +8,6 @@ export interface StorageProvider {
   name: string
   type: string
   config: string
-  status: string
   created_at: string
   updated_at: string
 }
@@ -38,7 +37,7 @@ export class StorageProviderManager {
 
     // Get provider details from database
     const db = getDatabase()
-    const provider = await db.query<StorageProvider>("SELECT * FROM storage_providers WHERE id = ?").get(providerId)
+    const provider = db.prepare("SELECT * FROM storage_providers WHERE id = ?").get(providerId) as StorageProvider | undefined
 
     if (!provider) {
       throw new Error(`Storage provider not found: ${providerId}`)
@@ -83,7 +82,6 @@ export class StorageProviderManager {
       name,
       type,
       config: JSON.stringify(config),
-      status: "active",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -100,9 +98,9 @@ export class StorageProviderManager {
 
     // Save provider to database
     const id = crypto.randomUUID()
-    await db.query(`
-      INSERT INTO storage_providers (id, name, type, config, status)
-      VALUES (?, ?, ?, ?, 'active')
+    db.prepare(`
+      INSERT INTO storage_providers (id, name, type, config)
+      VALUES (?, ?, ?, ?)
     `).run(id, name, type, JSON.stringify(config))
 
     return id
@@ -116,7 +114,7 @@ export class StorageProviderManager {
     }
   ): Promise<void> {
     const db = getDatabase()
-    const provider = await db.query<StorageProvider>("SELECT * FROM storage_providers WHERE id = ?").get(id)
+    const provider = db.prepare("SELECT * FROM storage_providers WHERE id = ?").get(id) as StorageProvider | undefined
 
     if (!provider) {
       throw new Error(`Storage provider not found: ${id}`)
@@ -124,7 +122,7 @@ export class StorageProviderManager {
 
     // Update provider
     if (updates.name) {
-      await db.query("UPDATE storage_providers SET name = ? WHERE id = ?").run(updates.name, id)
+      db.prepare("UPDATE storage_providers SET name = ? WHERE id = ?").run(updates.name, id)
     }
 
     if (updates.config) {
@@ -143,7 +141,7 @@ export class StorageProviderManager {
         throw new Error("Failed to connect to storage provider")
       }
 
-      await db.query("UPDATE storage_providers SET config = ? WHERE id = ?").run(
+      db.prepare("UPDATE storage_providers SET config = ? WHERE id = ?").run(
         JSON.stringify(updates.config),
         id
       )
@@ -155,12 +153,12 @@ export class StorageProviderManager {
 
   async deleteStorageProvider(id: string): Promise<void> {
     const db = getDatabase()
-    await db.query("DELETE FROM storage_providers WHERE id = ?").run(id)
+    db.prepare("DELETE FROM storage_providers WHERE id = ?").run(id)
     this.providers.delete(id)
   }
 
   async listStorageProviders(): Promise<StorageProvider[]> {
     const db = getDatabase()
-    return db.query<StorageProvider>("SELECT * FROM storage_providers ORDER BY name").all()
+    return db.prepare("SELECT * FROM storage_providers ORDER BY name").all() as StorageProvider[]
   }
 } 

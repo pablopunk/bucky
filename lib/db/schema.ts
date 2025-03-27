@@ -44,7 +44,7 @@ export interface StorageProvider {
   name: string;
   type: "s3" | "b2" | "storj";
   config: string; // JSON stringified StorageProviderCredentials
-  status: string;
+  status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS storage_providers (
   name TEXT NOT NULL,
   type TEXT NOT NULL,
   config TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active',
+  status TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

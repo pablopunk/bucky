@@ -80,6 +80,22 @@ export function runMigrations() {
       )
     `);
     
+    // Check if the storage_providers.status column exists and run migration to remove it
+    const hasStatusColumn = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('storage_providers') WHERE name='status'`).get() as ColumnResult;
+    if (hasStatusColumn.count > 0) {
+      console.log('Running migration to remove status column from storage_providers table');
+      
+      // Run the storage_providers table migration
+      const migration = migrations.find(m => m.name === "remove_storage_providers_status");
+      if (migration) {
+        console.log(`Executing migration: ${migration.name}`);
+        db.exec(migration.sql);
+        console.log(`Migration completed: ${migration.name}`);
+      }
+    } else {
+      console.log('Storage providers table already has status column removed, skipping migration');
+    }
+    
     // Commit transaction
     db.exec('COMMIT;');
     console.log('Database migrations completed successfully');
@@ -117,6 +133,40 @@ export const migrations = [
 
       -- Rename the backup table to the original name
       ALTER TABLE notification_settings_backup RENAME TO notification_settings;
+    `
+  },
+  // Migration to remove status column from storage_providers table
+  {
+    name: "remove_storage_providers_status",
+    sql: `
+      -- Create a new table without the status column
+      CREATE TABLE storage_providers_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        config TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Copy all data from the old table, excluding the status column
+      INSERT INTO storage_providers_new (id, name, type, config, created_at, updated_at)
+      SELECT id, name, type, config, created_at, updated_at
+      FROM storage_providers;
+
+      -- Drop the old table
+      DROP TABLE storage_providers;
+
+      -- Rename the new table to the original name
+      ALTER TABLE storage_providers_new RENAME TO storage_providers;
+
+      -- Recreate the updated_at trigger
+      CREATE TRIGGER IF NOT EXISTS storage_providers_updated_at
+      AFTER UPDATE ON storage_providers
+      BEGIN
+        UPDATE storage_providers SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = NEW.id;
+      END;
     `
   }
 ]; 
