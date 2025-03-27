@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface AppSettings {
   dataDirectory: string
@@ -76,11 +78,11 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading Settings..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchSettings(); }} />
   }
 
   return (

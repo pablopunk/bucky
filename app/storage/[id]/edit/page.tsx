@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface StorageProvider {
   id: string
@@ -133,11 +135,11 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading Edit..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchProvider(); }} />
   }
 
   if (!provider) {

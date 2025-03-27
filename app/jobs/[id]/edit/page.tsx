@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { ArrowLeft, Folder } from "lucide-react"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface StorageProvider {
   id: string
@@ -109,11 +111,11 @@ export default function EditBackupJobPage({ params }: { params: { id: string } }
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading Edit..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchProviders(); fetchJob(); }} />
   }
 
   return (

@@ -4,6 +4,7 @@ import { getBreeScheduler } from "@/lib/backup";
 import { StorageProviderManager } from "@/lib/storage";
 import { z } from "zod";
 import type { BackupJob } from "@/lib/db";
+import { apiLogger } from "@/lib/logger";
 
 const backupJobSchema = z.object({
   name: z.string().min(1),
@@ -19,6 +20,7 @@ const backupJobSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    apiLogger.info("POST /api/jobs request received")
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action");
     const jobId = searchParams.get("id");
@@ -168,6 +170,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    apiLogger.info("GET /api/jobs request received")
     const db = getDatabase();
     const jobs = db.prepare(`
       SELECT 
@@ -191,6 +194,7 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
+    apiLogger.info("DELETE /api/jobs request received")
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -209,10 +213,11 @@ export async function DELETE(request: Request) {
     const scheduler = getBreeScheduler();
     await scheduler.loadJobs();
     
-    console.log(`Job ${id} deleted and scheduler reloaded`);
+    apiLogger.info(`Job ${id} deleted and scheduler reloaded`);
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    apiLogger.error("Failed to delete backup job", { error });
     return NextResponse.json(
       { error: "Failed to delete backup job" },
       { status: 500 }

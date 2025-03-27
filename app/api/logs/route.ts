@@ -4,7 +4,7 @@ import path from "path"
 import os from "os"
 
 // Function to get log files from the logs directory
-async function getLogFiles() {
+async function getLogFiles(includeStats = false) {
   try {
     // Default logs directory path - adjust as needed for your application
     const logsDir = process.env.LOGS_DIR || path.join(process.cwd(), "logs")
@@ -18,12 +18,36 @@ async function getLogFiles() {
     }
     
     const files = await fs.readdir(logsDir)
-    return files
-      .filter(file => file.endsWith(".log"))
-      .map(file => ({
+    const logFiles = files.filter(file => file.endsWith(".log"))
+    
+    if (!includeStats) {
+      return logFiles.map(file => ({
         name: file,
         path: path.join(logsDir, file)
       }))
+    }
+    
+    // Get file stats if requested
+    const filesWithStats = await Promise.all(
+      logFiles.map(async (file) => {
+        const filePath = path.join(logsDir, file)
+        const stats = await fs.stat(filePath)
+        const fileContent = stats.size > 0 
+          ? await fs.readFile(filePath, "utf-8")
+          : ""
+          
+        return {
+          name: file,
+          path: filePath,
+          size: stats.size,
+          isEmpty: stats.size === 0 || !fileContent.trim(),
+          lastModified: stats.mtime
+        }
+      })
+    )
+    
+    // Sort by newest first
+    return filesWithStats.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime())
   } catch (error) {
     console.error("Error getting log files:", error)
     return []
@@ -44,6 +68,18 @@ async function getLogContent(logFile: string, limit = 1000) {
       throw new Error("Invalid log file path")
     }
     
+    // Check if file exists
+    try {
+      await fs.access(filePath)
+    } catch {
+      return ""
+    }
+    
+    const stats = await fs.stat(filePath)
+    if (stats.size === 0) {
+      return ""
+    }
+    
     const content = await fs.readFile(filePath, "utf-8")
     
     // Split by newlines, get the most recent lines up to the limit
@@ -62,6 +98,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const fileName = url.searchParams.get("file")
     const limitParam = url.searchParams.get("limit")
+    const includeStats = url.searchParams.get("includeStats") === "true"
     const limit = limitParam ? parseInt(limitParam, 10) : 1000
     
     // If a specific file is requested, return its content
@@ -71,7 +108,7 @@ export async function GET(request: Request) {
     }
     
     // Otherwise, return the list of available log files
-    const logFiles = await getLogFiles()
+    const logFiles = await getLogFiles(includeStats)
     return NextResponse.json({ files: logFiles })
   } catch (error) {
     console.error("Error in logs API:", error)

@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, CheckCircle, Edit, RefreshCw, StopCircle, Trash, XCircle, Clock, FileArchive } from "lucide-react"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface BackupJob {
   id: string
@@ -186,11 +188,11 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading data..." />
   }
 
   if (error || !job) {
-    return <div>Error: {error || "Job not found"}</div>
+    return <ErrorState error={error || "Job not found"} onRetry={() => { fetchJob(); fetchJobHistory(); }} />
   }
 
   return (
@@ -310,7 +312,7 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
                             )}
                           </div>
                           {item.message && (
-                            <p className="text-sm text-muted-foreground">{item.message}</p>
+                            <p className="text-sm text-muted-foreground whitespace-normal">{item.message}</p>
                           )}
                           <div className="flex justify-between items-center text-xs text-muted-foreground">
                             <span>{formatDate(item.start_time)}</span>

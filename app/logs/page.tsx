@@ -1,177 +1,291 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { DownloadIcon, RefreshCw } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { RefreshCw, Download, FileText, AlertTriangle } from "lucide-react"
+import { LoadingState } from "@/components/ui/loading-state"
+import { Badge } from "@/components/ui/badge"
 
+// Type for log files
 type LogFile = {
   name: string
   path: string
+  size?: number
+  isEmpty?: boolean
+  lastModified?: Date
 }
 
 export default function LogsPage() {
   const [logFiles, setLogFiles] = useState<LogFile[]>([])
-  const [selectedLog, setSelectedLog] = useState<string>("")
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [logContent, setLogContent] = useState<string>("")
-  const [loading, setLoading] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [refreshing, setRefreshing] = useState<boolean>(false)
+  const [activeTab, setActiveTab] = useState<string>("all")
+  const [searchQuery, setSearchQuery] = useState<string>("")
 
-  // Fetch available log files
-  const fetchLogFiles = async () => {
+  // Function to fetch log files
+  const fetchLogFiles = useCallback(async () => {
     try {
-      setLoading(true)
-      const response = await fetch("/api/logs")
-      if (!response.ok) {
-        throw new Error("Failed to fetch log files")
-      }
+      const response = await fetch('/api/logs?includeStats=true')
       const data = await response.json()
-      setLogFiles(data.files || [])
       
-      // Select the first log file by default if available
-      if (data.files && data.files.length > 0 && !selectedLog) {
-        setSelectedLog(data.files[0].name)
+      if (data.files && Array.isArray(data.files)) {
+        setLogFiles(data.files)
+        
+        // Find the first non-empty log file, or just use the first file if all are empty
+        const nonEmptyFile = data.files.find((file: LogFile) => !file.isEmpty)
+        const firstFile = data.files[0]
+        
+        if (nonEmptyFile || firstFile) {
+          const fileToSelect = nonEmptyFile || firstFile
+          setSelectedFile(fileToSelect.name)
+          fetchLogContent(fileToSelect.name)
+        } else {
+          setLogContent("")
+          setSelectedFile(null)
+        }
       }
     } catch (error) {
-      console.error("Error fetching logs:", error)
-      toast.error("Failed to load log files")
+      console.error("Error fetching log files:", error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  // Fetch log content for a specific file
-  const fetchLogContent = async (fileName: string) => {
-    if (!fileName) return
-    
+  // Function to fetch log content
+  const fetchLogContent = useCallback(async (fileName: string) => {
     try {
-      setLoading(true)
-      const response = await fetch(`/api/logs?file=${encodeURIComponent(fileName)}`)
-      if (!response.ok) {
-        throw new Error("Failed to fetch log content")
-      }
+      const response = await fetch(`/api/logs?file=${fileName}`)
       const data = await response.json()
-      setLogContent(data.content || "No logs available")
+      setLogContent(data.content || "")
     } catch (error) {
       console.error("Error fetching log content:", error)
-      toast.error("Failed to load log content")
-      setLogContent("Error loading log content")
-    } finally {
-      setLoading(false)
+      setLogContent("")
     }
+  }, [])
+
+  // Format file size for display
+  const formatFileSize = (bytes?: number): string => {
+    if (bytes === undefined) return "Unknown size"
+    if (bytes === 0) return "0 B"
+    
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
   }
 
-  // Handle refresh button click
+  // Function to handle log file selection
+  const handleSelectFile = (file: LogFile) => {
+    setSelectedFile(file.name)
+    fetchLogContent(file.name)
+  }
+
+  // Function to handle refresh button click
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchLogFiles()
-    if (selectedLog) {
-      await fetchLogContent(selectedLog)
+    if (selectedFile) {
+      await fetchLogContent(selectedFile)
     }
     setRefreshing(false)
-    toast.success("Logs refreshed")
   }
 
-  // Handle log file selection
-  const handleLogSelect = (value: string) => {
-    setSelectedLog(value)
-    fetchLogContent(value)
-  }
-
-  // Download complete log file
-  const handleDownload = async () => {
-    if (!selectedLog) return
-    
+  // Function to handle log file download
+  const handleDownload = async (fileName: string) => {
     try {
-      window.open(`/api/logs/download?file=${encodeURIComponent(selectedLog)}`, '_blank')
+      const response = await fetch(`/api/logs/download?file=${fileName}`)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
     } catch (error) {
       console.error("Error downloading log file:", error)
-      toast.error("Failed to download log file")
     }
   }
 
-  // Initial load
+  // Filter log files based on active tab
+  const getFilteredLogFiles = () => {
+    if (activeTab === "all") return logFiles
+    return logFiles.filter(file => file.name.startsWith(activeTab))
+  }
+
+  // Filter logs by search query
+  const filterLogContent = (content: string): string => {
+    if (!searchQuery.trim()) return content;
+    
+    const lines = content.split(/\r?\n/);
+    const filteredLines = lines.filter(line => 
+      line.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    return filteredLines.join('\n');
+  }
+  
+  // Format log content with colors based on log level
+  const formatLogLine = (line: string): React.ReactElement => {
+    let className = "";
+    
+    if (line.includes("[ERROR]")) {
+      className = "text-red-500";
+    } else if (line.includes("[WARN]")) {
+      className = "text-amber-500";
+    } else if (line.includes("[INFO]")) {
+      className = "text-blue-500";
+    } else if (line.includes("[DEBUG]")) {
+      className = "text-gray-500";
+    }
+    
+    return <div className={className}>{line}</div>;
+  }
+  
+  // Render formatted log content
+  const renderLogContent = (content: string): React.ReactElement[] => {
+    if (!content) return [];
+    
+    const filteredContent = filterLogContent(content);
+    const lines = filteredContent.split(/\r?\n/);
+    
+    return lines.map((line, index) => (
+      <div key={index}>{formatLogLine(line)}</div>
+    ));
+  }
+
   useEffect(() => {
     fetchLogFiles()
-  }, [])
+  }, [fetchLogFiles])
 
-  // Fetch log content when selected log changes
-  useEffect(() => {
-    if (selectedLog) {
-      fetchLogContent(selectedLog)
-    }
-  }, [selectedLog])
+  if (loading) {
+    return <LoadingState />
+  }
 
   return (
-    <div className="flex flex-col space-y-4 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Logs</h1>
-          <p className="text-muted-foreground">View application and job logs</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">System Logs</h1>
+        <div className="flex gap-2">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search in logs..."
+              className="px-3 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button 
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={() => setSearchQuery("")}
+              >
+                ×
+              </button>
+            )}
+          </div>
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={handleRefresh}
+            onClick={handleRefresh} 
             disabled={refreshing}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleDownload}
-            disabled={!selectedLog}
-          >
-            <DownloadIcon className="h-4 w-4 mr-2" />
-            Download Full Log
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Log Viewer</CardTitle>
-              <CardDescription>
-                View recent logs (limited to 1000 lines in the UI)
-              </CardDescription>
-            </div>
-            <Select value={selectedLog} onValueChange={handleLogSelect}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select a log file" />
-              </SelectTrigger>
-              <SelectContent>
-                {logFiles.length === 0 ? (
-                  <SelectItem value="none" disabled>No log files available</SelectItem>
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">All Logs</TabsTrigger>
+          <TabsTrigger value="app">App</TabsTrigger>
+          <TabsTrigger value="app-api">API</TabsTrigger>
+          <TabsTrigger value="app-jobs">Jobs</TabsTrigger>
+          <TabsTrigger value="app-storage">Storage</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab} className="mt-0">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle>Log Files</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {getFilteredLogFiles().length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No log files found
+                  </div>
                 ) : (
-                  logFiles.map((file) => (
-                    <SelectItem key={file.name} value={file.name}>
-                      {file.name}
-                    </SelectItem>
-                  ))
+                  <div className="space-y-2">
+                    {getFilteredLogFiles().map((file) => (
+                      <div
+                        key={file.name}
+                        className={`flex justify-between items-center p-2 rounded cursor-pointer ${
+                          selectedFile === file.name
+                            ? 'bg-primary/10'
+                            : 'hover:bg-muted'
+                        }`}
+                        onClick={() => handleSelectFile(file)}
+                      >
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          <div>
+                            <div className="font-medium">{file.name}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              {formatFileSize(file.size)}
+                              {file.isEmpty && (
+                                <Badge variant="outline" className="text-xs">Empty</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation() 
+                            handleDownload(file.name)
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </SelectContent>
-            </Select>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-3">
+              <CardHeader>
+                <CardTitle>
+                  {selectedFile ? `Content: ${selectedFile}` : 'Log Content'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!selectedFile ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Select a log file to view its content
+                  </div>
+                ) : logContent ? (
+                  <pre className="bg-muted p-4 rounded-md overflow-auto h-[500px] text-sm">
+                    {renderLogContent(logContent)}
+                  </pre>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500" />
+                    <p>This log file is empty</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="h-[500px] flex items-center justify-center">
-              <p>Loading logs...</p>
-            </div>
-          ) : (
-            <pre className="bg-card border rounded-md p-4 h-[500px] overflow-auto text-sm font-mono whitespace-pre-wrap">
-              {logContent || "Select a log file to view"}
-            </pre>
-          )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 } 

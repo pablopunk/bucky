@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Folder } from "lucide-react"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface StorageProvider {
   id: string
@@ -135,11 +137,11 @@ export default function NewBackupJobPage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading New..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchProviders(); }} />
   }
 
   const selectedProvider = providers.find(p => p.id === storageProviderId)

@@ -8,6 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, CheckCircle, XCircle, Clock, FileArchive } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
+import logger from "@/lib/logger"
 
 interface BackupStats {
   totalJobs: number
@@ -68,6 +71,8 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("overview")
 
   useEffect(() => {
+    // Client-side logging doesn't need to wait for async operations
+    logger.info("Dashboard page loaded")
     fetchStats()
     fetchActivity()
     fetchBackupJobs()
@@ -129,11 +134,11 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading App..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchStats(); fetchActivity(); fetchBackupJobs(); fetchStorageProviders(); }} />
   }
 
   return (
@@ -286,7 +291,7 @@ export default function DashboardPage() {
                               <Badge className="bg-blue-500 text-white">Running</Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">{item.message}</p>
+                          <p className="text-sm text-muted-foreground whitespace-normal">{item.message}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(item.timestamp).toLocaleString()}
                           </p>
@@ -351,7 +356,7 @@ export default function DashboardPage() {
                       {item.status === "running" && <Clock className="h-5 w-5 text-blue-500" />}
                       <div className="flex-1 space-y-1">
                         <p className="text-sm font-medium leading-none">{item.jobName}</p>
-                        <p className="text-sm text-muted-foreground">{item.message}</p>
+                        <p className="text-sm text-muted-foreground whitespace-normal">{item.message}</p>
                       </div>
                       <div className="text-sm text-muted-foreground font-mono">
                         {new Date(item.timestamp).toLocaleString()}

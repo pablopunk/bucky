@@ -1,39 +1,27 @@
-import fs from "fs"
-import path from "path"
+// Use dynamic imports for Node.js modules to be compatible with Next.js
 import { format } from "date-fns"
-
-// Ensure logs directory exists
-const logsDir = process.env.LOGS_DIR || path.join(process.cwd(), "logs")
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true })
-}
 
 // Log types
 export type LogLevel = "info" | "warn" | "error" | "debug"
 
-// Logger class
-class Logger {
-  private logFile: string
-  private stream: fs.WriteStream | null = null
+// Logger interface that both client and server implementations will follow
+interface ILogger {
+  info(message: string, meta?: any): void;
+  warn(message: string, meta?: any): void;
+  error(message: string, meta?: any): void;
+  debug(message: string, meta?: any): void;
+  child(name: string): ILogger;
+}
+
+// Base logger functionality
+class BaseLogger implements ILogger {
+  protected name: string;
   
   constructor(name: string = "app") {
-    // Create a log file for each day
-    const date = format(new Date(), "yyyy-MM-dd")
-    this.logFile = path.join(logsDir, `${name}-${date}.log`)
-    
-    // Create or open the log file
-    this.initStream()
+    this.name = name;
   }
   
-  private initStream() {
-    try {
-      this.stream = fs.createWriteStream(this.logFile, { flags: "a" })
-    } catch (error) {
-      console.error("Failed to initialize log stream:", error)
-    }
-  }
-  
-  private formatMessage(level: LogLevel, message: string, meta?: any): string {
+  protected formatMessage(level: LogLevel, message: string, meta?: any): string {
     const timestamp = format(new Date(), "yyyy-MM-dd HH:mm:ss.SSS")
     let formattedMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`
     
@@ -49,60 +37,58 @@ class Logger {
     return formattedMessage
   }
   
-  log(level: LogLevel, message: string, meta?: any) {
-    if (!this.stream) {
-      this.initStream()
-    }
-    
-    const formattedMessage = this.formatMessage(level, message, meta)
-    
-    // Write to console
-    console[level](formattedMessage)
-    
-    // Write to file
-    if (this.stream) {
-      this.stream.write(`${formattedMessage}\n`)
-    }
+  info(message: string, meta?: any): void {
+    console.info(this.formatMessage("info", message, meta));
   }
   
-  info(message: string, meta?: any) {
-    this.log("info", message, meta)
+  warn(message: string, meta?: any): void {
+    console.warn(this.formatMessage("warn", message, meta));
   }
   
-  warn(message: string, meta?: any) {
-    this.log("warn", message, meta)
+  error(message: string, meta?: any): void {
+    console.error(this.formatMessage("error", message, meta));
   }
   
-  error(message: string, meta?: any) {
-    this.log("error", message, meta)
-  }
-  
-  debug(message: string, meta?: any) {
+  debug(message: string, meta?: any): void {
     if (process.env.NODE_ENV !== "production") {
-      this.log("debug", message, meta)
+      console.debug(this.formatMessage("debug", message, meta));
     }
   }
   
-  // Create a specialized logger for a component
-  child(name: string) {
-    return new Logger(name)
-  }
-  
-  // For clean shutdown
-  close() {
-    if (this.stream) {
-      this.stream.end()
-      this.stream = null
-    }
+  child(name: string): ILogger {
+    // This will be overridden by the specific implementations
+    return new BaseLogger(name);
   }
 }
 
-// Create the default app logger
-const logger = new Logger()
+// Client-side logger (simple console output only)
+class ClientLogger extends BaseLogger {
+  child(name: string): ILogger {
+    return new ClientLogger(name);
+  }
+}
 
-// Create specific loggers for different components
-export const jobLogger = logger.child("jobs")
-export const storageLogger = logger.child("storage")
-export const apiLogger = logger.child("api")
+// Create loggers based on environment
+let logger: ILogger;
+let apiLogger: ILogger;
+let jobLogger: ILogger;
+let storageLogger: ILogger;
 
-export default logger 
+// We need to use this pattern to avoid Next.js bundling the server-side code
+if (typeof window === 'undefined') {
+  // Only import server-side logger on the server
+  const { createServerLogger } = require('./logger.server');
+  logger = createServerLogger();
+  apiLogger = logger.child("api");
+  jobLogger = logger.child("jobs");
+  storageLogger = logger.child("storage");
+} else {
+  // Use client logger in the browser
+  logger = new ClientLogger();
+  apiLogger = logger.child("api");
+  jobLogger = logger.child("jobs");
+  storageLogger = logger.child("storage");
+}
+
+export { apiLogger, jobLogger, storageLogger };
+export default logger; 

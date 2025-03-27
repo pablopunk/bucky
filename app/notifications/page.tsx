@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface SMTPConfig {
   host: string
@@ -139,11 +141,11 @@ export default function NotificationsPage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading Notifications..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchSMTPConfig(); fetchNotificationSettings(); }} />
   }
 
   return (

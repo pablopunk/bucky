@@ -19,6 +19,8 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Cloud, Database, Edit, Plus, RefreshCw, Trash } from "lucide-react"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface StorageProvider {
   id: string
@@ -129,11 +131,11 @@ export default function StoragePage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading Storage..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchProviders(); }} />
   }
   
   return (

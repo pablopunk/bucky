@@ -13,6 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
 
 interface BackupJob {
   id: string
@@ -256,11 +258,11 @@ export default function JobsPage() {
   };
 
   if (loading) {
-    return <div>Loading...</div>
+    return <LoadingState message="Loading backup jobs..." />
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <ErrorState error={error} onRetry={() => { fetchJobs(); fetchHistory(); }} />
   }
 
   return (
@@ -470,7 +472,7 @@ export default function JobsPage() {
                         {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                       </div>
                     </TableCell>
-                    <TableCell>{entry.message || "-"}</TableCell>
+                    <TableCell className="whitespace-normal max-w-md">{entry.message || "-"}</TableCell>
                     <TableCell>{new Date(entry.created_at).toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
