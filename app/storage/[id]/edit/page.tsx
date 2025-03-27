@@ -17,7 +17,7 @@ import { ErrorState } from "@/components/ui/error-state"
 interface StorageProvider {
   id: string
   name: string
-  type: "s3" | "b2" | "storj"
+  type: "storj"
   config: string
   status: string
   created_at: string
@@ -31,7 +31,7 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
   const [provider, setProvider] = useState<StorageProvider | null>(null)
 
   const [name, setName] = useState("")
-  const [type, setType] = useState<"s3" | "b2" | "storj">("s3")
+  const [type, setType] = useState<"storj">("storj")
   const [bucket, setBucket] = useState("")
   const [accessKey, setAccessKey] = useState("")
   const [secretKey, setSecretKey] = useState("")
@@ -80,35 +80,18 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
     setLoading(true)
     setError(null)
 
+    // Create config object
+    let config = {}
+
+    // Storj configuration
+    config = {
+      bucket,
+      endpoint,
+      accessKey,
+      secretKey,
+    }
+
     try {
-      let credentials: Record<string, any> = {
-        type,
-        bucket,
-      }
-
-      if (type === "storj") {
-        credentials = {
-          ...credentials,
-          accessKey,
-          secretKey,
-          endpoint: endpoint || "https://gateway.storjshare.io",
-        }
-      } else if (type === "s3") {
-        credentials = {
-          ...credentials,
-          accessKeyId: accessKey,
-          secretAccessKey: secretKey,
-          region: region || "us-east-1",
-          endpoint: endpoint || undefined,
-        }
-      } else if (type === "b2") {
-        credentials = {
-          ...credentials,
-          applicationKeyId: accessKey,
-          applicationKey: secretKey,
-        }
-      }
-
       const response = await fetch(`/api/storage?id=${params.id}`, {
         method: "PUT",
         headers: {
@@ -117,7 +100,7 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
         body: JSON.stringify({
           name,
           type,
-          credentials,
+          credentials: config,
         }),
       })
 
@@ -179,127 +162,50 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
 
               <div className="space-y-2">
                 <Label htmlFor="type">Provider Type</Label>
-                <Select value={type} onValueChange={(value: "s3" | "b2" | "storj") => setType(value)}>
-                  <SelectTrigger id="type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="s3">Amazon S3</SelectItem>
-                    <SelectItem value="b2">Backblaze B2</SelectItem>
-                    <SelectItem value="storj">Storj</SelectItem>
-                  </SelectContent>
+                <Select value={type} onValueChange={(value: "storj") => setType(value)}>
+                  <SelectItem value="storj">Storj DCS</SelectItem>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="bucket">Bucket Name</Label>
+                <Label htmlFor="bucket">Bucket</Label>
                 <Input
                   id="bucket"
-                  placeholder="my-bucket"
                   value={bucket}
                   onChange={(e) => setBucket(e.target.value)}
                   required
                 />
               </div>
 
-              {type === "storj" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="access-key">Access Key</Label>
-                    <Input
-                      id="access-key"
-                      value={accessKey}
-                      onChange={(e) => setAccessKey(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="secret-key">Secret Key</Label>
-                    <Input
-                      id="secret-key"
-                      type="password"
-                      value={secretKey}
-                      onChange={(e) => setSecretKey(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endpoint">Endpoint</Label>
-                    <Input
-                      id="endpoint"
-                      placeholder="https://gateway.storjshare.io"
-                      value={endpoint}
-                      onChange={(e) => setEndpoint(e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-
-              {type === "s3" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="access-key">Access Key ID</Label>
-                    <Input
-                      id="access-key"
-                      value={accessKey}
-                      onChange={(e) => setAccessKey(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="secret-key">Secret Access Key</Label>
-                    <Input
-                      id="secret-key"
-                      type="password"
-                      value={secretKey}
-                      onChange={(e) => setSecretKey(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="region">Region</Label>
-                    <Input
-                      id="region"
-                      placeholder="us-east-1"
-                      value={region}
-                      onChange={(e) => setRegion(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endpoint">Endpoint (optional)</Label>
-                    <Input
-                      id="endpoint"
-                      placeholder="https://s3.amazonaws.com"
-                      value={endpoint}
-                      onChange={(e) => setEndpoint(e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-
-              {type === "b2" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="access-key">Application Key ID</Label>
-                    <Input
-                      id="access-key"
-                      value={accessKey}
-                      onChange={(e) => setAccessKey(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="secret-key">Application Key</Label>
-                    <Input
-                      id="secret-key"
-                      type="password"
-                      value={secretKey}
-                      onChange={(e) => setSecretKey(e.target.value)}
-                      required
-                    />
-                  </div>
-                </>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="access-key">Access Key</Label>
+                <Input
+                  id="access-key"
+                  value={accessKey}
+                  onChange={(e) => setAccessKey(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="secret-key">Secret Key</Label>
+                <Input
+                  id="secret-key"
+                  type="password"
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endpoint">Endpoint</Label>
+                <Input
+                  id="endpoint"
+                  placeholder="https://gateway.storjshare.io"
+                  value={endpoint}
+                  onChange={(e) => setEndpoint(e.target.value)}
+                  required
+                />
+              </div>
             </CardContent>
           </Card>
 

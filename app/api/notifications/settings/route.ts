@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getDatabase } from "@/lib/db"
 import type { NotificationSettings } from "@/lib/db"
 import { z } from "zod"
-import crypto from "crypto"
+import { generateUUID } from "@/lib/crypto"
 
 const notificationSettingsSchema = z.object({
   onSuccess: z.boolean(),
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           on_failure
         ) VALUES (?, ?, ?, ?)
       `).run(
-        crypto.randomUUID(),
+        generateUUID(),
         validatedSettings.email || "",
         validatedSettings.onSuccess ? 1 : 0,
         validatedSettings.onFailure ? 1 : 0

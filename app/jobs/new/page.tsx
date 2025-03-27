@@ -17,14 +17,10 @@ import { ErrorState } from "@/components/ui/error-state"
 interface StorageProvider {
   id: string
   name: string
-  type: "s3" | "b2" | "storj"
-  credentials: {
-    endpoint: string
-    accessKey: string
-    secretKey: string
-  }
-  createdAt: string
-  updatedAt: string
+  type: "storj"
+  config: string
+  created_at: string
+  updated_at: string
 }
 
 interface BackupJob {

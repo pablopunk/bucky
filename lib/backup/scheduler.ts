@@ -7,6 +7,7 @@ import { StorageProviderManager } from "../storage";
 import { sendBackupNotification } from "../email";
 import { NotificationSettings } from "../db";
 import { sendEmail } from "../email";
+import { generateUUID } from "../crypto";
 
 export class BackupScheduler {
   private jobs: Map<string, ReturnType<typeof setTimeout>>;
@@ -132,16 +133,16 @@ export class BackupScheduler {
         id, job_id, status, start_time, end_time,
         size, message, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run([
-      crypto.randomUUID(),
+    ).run(
+      generateUUID(),
       job.id,
       success ? "success" : "failed",
       startTime,
       endTime,
       0, // Size will be updated after upload
       error || null,
-      new Date().toISOString(),
-    ]);
+      new Date().toISOString()
+    );
   }
 
   async runJob(job: BackupJob): Promise<void> {
@@ -154,7 +155,7 @@ export class BackupScheduler {
         `UPDATE backup_jobs 
          SET status = ?, last_run = ? 
          WHERE id = ?`
-      ).run(["in_progress" as const, startTime, job.id]);
+      ).run("in_progress", startTime, job.id);
 
       // Get storage provider
       const provider = await this.getStorageProvider(job.storage_provider_id);
@@ -173,23 +174,23 @@ export class BackupScheduler {
           id, job_id, status, start_time, end_time,
           size, message, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run([
-        crypto.randomUUID(),
+      ).run(
+        generateUUID(),
         job.id,
         result.success ? "success" : "failed",
         startTime,
         new Date().toISOString(),
         result.size,
         result.error || null,
-        new Date().toISOString(),
-      ]);
+        new Date().toISOString()
+      );
 
       // Update job status
       db.prepare(
         `UPDATE backup_jobs 
          SET status = ?, last_run = ? 
          WHERE id = ?`
-      ).run([result.success ? "active" as const : "failed" as const, startTime, job.id]);
+      ).run(result.success ? "active" : "failed", startTime, job.id);
 
       // Send email notification
       await this.sendNotification(job, result.success, result.error || "");
@@ -206,7 +207,7 @@ export class BackupScheduler {
           size, message, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
-        crypto.randomUUID(),
+        generateUUID(),
         job.id,
         "failed",
         startTime,
@@ -221,7 +222,7 @@ export class BackupScheduler {
         `UPDATE backup_jobs 
          SET status = ?, last_run = ? 
          WHERE id = ?`
-      ).run(["failed" as const, startTime, job.id]);
+      ).run("failed", startTime, job.id);
 
       // Send email notification for failure
       await this.sendNotification(job, false, error instanceof Error ? error.message : "Unknown error");

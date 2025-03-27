@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/db";
 import type { SMTPConfig } from "@/lib/db";
 import { z } from "zod";
-import crypto from "crypto";
+import { generateUUID } from "@/lib/crypto";
 
 const smtpConfigSchema = z.object({
   host: z.string(),
@@ -37,11 +37,6 @@ async function retryOperation<T>(operation: () => T, maxRetries = 5, delay = 200
   }
   
   throw lastError;
-}
-
-// Generate UUID for database records
-function generateId(): string {
-  return crypto.randomUUID();
 }
 
 export async function GET() {
@@ -143,7 +138,7 @@ export async function POST(request: Request) {
                 updated_at
               ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             `).run(
-              generateId(),
+              generateUUID(),
               validatedConfig.host,
               validatedConfig.port,
               validatedConfig.username,

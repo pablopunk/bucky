@@ -3,6 +3,7 @@ import path from "path"
 import { schema } from "./schema"
 import { runMigrations } from "./migrations"
 import fs from "fs"
+import { generateUUID } from "../crypto"
 
 // Cache for database connections
 const connections = new Map<number, Database>()
@@ -187,7 +188,7 @@ export interface Settings {
 
 // Utility functions for common operations
 export function generateId(): string {
-  return crypto.randomUUID()
+  return generateUUID()
 }
 
 export function getTimestamp(): string {

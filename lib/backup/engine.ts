@@ -2,7 +2,7 @@ import { StorageProvider } from "../storage";
 import { createReadStream, createWriteStream, statSync, mkdirSync, existsSync, readdirSync } from "fs";
 import { readFile } from "fs/promises";
 import { pipeline } from "stream/promises";
-import { createHash } from "crypto";
+import { createHashObject } from "../crypto";
 import { join, basename, dirname, relative } from "path";
 import { BackupJob } from "../db";
 import { exec } from "child_process";
@@ -22,7 +22,7 @@ export class BackupEngine {
   constructor(private storageProvider: StorageProvider) {}
 
   private async uploadDirectory(localPath: string, remoteBasePath: string, sourceParent: string): Promise<{ totalSize: number; totalHash: string }> {
-    const hash = createHash("sha256");
+    const hash = createHashObject("sha256");
     let totalSize = 0;
 
     const files = readdirSync(localPath, { withFileTypes: true });
@@ -40,7 +40,7 @@ export class BackupEngine {
       } else {
         // Upload files
         const fileContent = await readFile(localFilePath);
-        const fileHash = createHash("sha256");
+        const fileHash = createHashObject("sha256");
         fileHash.update(fileContent);
         const fileHashHex = fileHash.digest("hex");
         
@@ -112,12 +112,12 @@ export class BackupEngine {
 
       // Calculate total size and hash
       let totalSize = 0;
-      const hash = createHash("sha256");
+      const hash = createHashObject("sha256");
 
       for (const file of files) {
         const localPath = join(destination, relative(backupPath, file));
         const fileContent = await readFile(localPath);
-        const fileHash = createHash("sha256");
+        const fileHash = createHashObject("sha256");
         fileHash.update(fileContent);
         hash.update(fileHash.digest("hex"));
         

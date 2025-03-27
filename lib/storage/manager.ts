@@ -1,7 +1,6 @@
-import { S3Provider } from "./providers/s3"
-import { B2Provider } from "./providers/b2"
 import { StorjProvider } from "./providers/storj"
 import { getDatabase } from "@/lib/db"
+import { generateUUID } from "@/lib/crypto"
 
 export interface StorageProvider {
   id: string
@@ -53,10 +52,6 @@ export class StorageProviderManager {
     const config = JSON.parse(provider.config)
 
     switch (provider.type) {
-      case "s3":
-        return new S3Provider(config)
-      case "b2":
-        return new B2Provider(config)
       case "storj":
         return new StorjProvider(config)
       default:
@@ -72,7 +67,7 @@ export class StorageProviderManager {
     const db = getDatabase()
 
     // Validate provider type
-    if (!["s3", "b2", "storj"].includes(type)) {
+    if (!["storj"].includes(type)) {
       throw new Error(`Unsupported storage provider type: ${type}`)
     }
 
@@ -97,7 +92,7 @@ export class StorageProviderManager {
     }
 
     // Save provider to database
-    const id = crypto.randomUUID()
+    const id = generateUUID()
     db.prepare(`
       INSERT INTO storage_providers (id, name, type, config)
       VALUES (?, ?, ?, ?)

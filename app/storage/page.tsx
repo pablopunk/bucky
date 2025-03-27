@@ -25,8 +25,8 @@ import { ErrorState } from "@/components/ui/error-state"
 interface StorageProvider {
   id: string
   name: string
-  type: "s3" | "b2" | "storj"
-  status?: string // Will be replaced by connectionStatus
+  type: "storj"
+  config: string
   created_at: string
   updated_at: string
 }
@@ -220,7 +220,7 @@ export default function StoragePage() {
                     return (
                       <TableRow key={provider.id}>
                         <TableCell className="font-medium">{provider.name}</TableCell>
-                        <TableCell>{provider.type.toUpperCase()}</TableCell>
+                        <TableCell>Storj</TableCell>
                         <TableCell>
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${

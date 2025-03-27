@@ -9,7 +9,7 @@ import { pipeline } from 'stream/promises';
 import { createGzip } from 'zlib';
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
-import { randomBytes } from 'crypto';
+import { randomBytes } from '../crypto';
 
 const execAsync = promisify(exec);
 
@@ -32,7 +32,7 @@ export class BackupService {
       
       // Create temporary filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const tempId = randomBytes(4).toString('hex');
+      const tempId = randomBytes(4);
       const sourceName = basename(job.source_path);
       const tempFilename = join(tmpdir(), `${sourceName}-${timestamp}-${tempId}`);
       

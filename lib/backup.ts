@@ -5,6 +5,7 @@ import { promisify } from "util"
 import path from "path"
 import fs from "fs"
 import nodemailer from "nodemailer"
+import { generateUUID } from "./crypto"
 
 // Promisify exec for async/await usage
 const execAsync = promisify(exec);
@@ -162,11 +163,7 @@ async function createRcloneConfig(providerId: string): Promise<string> {
     }
     
     // Validate credentials based on provider type - using consistent field names matching the database
-    if (provider.type === 's3' && (!credentials.accessKey || !credentials.secretKey)) {
-      throw new Error(`S3 provider ${provider.name} is missing required credentials (accessKey/secretKey)`);
-    } else if (provider.type === 'b2' && (!credentials.accountId || !credentials.applicationKey)) {
-      throw new Error(`B2 provider ${provider.name} is missing required credentials (accountId/applicationKey)`);
-    } else if (provider.type === 'storj' && (!credentials.accessKey || !credentials.secretKey)) {
+    if (provider.type === 'storj' && (!credentials.accessKey || !credentials.secretKey)) {
       throw new Error(`Storj provider ${provider.name} is missing required credentials (accessKey/secretKey)`);
     }
     
@@ -182,25 +179,7 @@ async function createRcloneConfig(providerId: string): Promise<string> {
     // Generate different config based on provider type
     let configContent = '';
     
-    if (provider.type === 's3') {
-      configContent = `
-[${provider.name}]
-type = s3
-provider = ${credentials.provider || 'AWS'}
-access_key_id = ${credentials.accessKey}
-secret_access_key = ${credentials.secretKey}
-region = ${credentials.region}
-endpoint = ${credentials.endpoint || ''}
-acl = ${credentials.acl || 'private'}
-`;
-    } else if (provider.type === 'b2') {
-      configContent = `
-[${provider.name}]
-type = b2
-account = ${credentials.accountId}
-key = ${credentials.applicationKey}
-`;
-    } else if (provider.type === 'storj') {
+    if (provider.type === 'storj') {
       configContent = `
 [${provider.name}]
 type = s3
@@ -266,7 +245,7 @@ export async function runBackupJob(jobId: string) {
     `).run(new Date().toISOString(), jobId);
     
     // Create history record for this execution
-    const historyId = crypto.randomUUID();
+    const historyId = generateUUID();
     const startTime = new Date().toISOString();
     
     jobLogger.info(`Creating history record for job ${jobId} with ID ${historyId}`);

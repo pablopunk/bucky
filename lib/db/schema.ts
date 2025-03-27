@@ -1,35 +1,6 @@
 import type { Database } from "bun:sqlite"
 
 export interface StorageCredentials {
-  type: "s3" | "b2" | "storj"
-  accessKeyId?: string
-  secretAccessKey?: string
-  applicationKeyId?: string
-  applicationKey?: string
-  accessKey?: string
-  secretKey?: string
-  bucket: string
-  region?: string
-  endpoint?: string
-}
-
-export interface S3Credentials extends StorageCredentials {
-  type: "s3";
-  accessKeyId: string;
-  secretAccessKey: string;
-  bucket: string;
-  region?: string;
-  endpoint?: string;
-}
-
-export interface B2Credentials extends StorageCredentials {
-  type: "b2";
-  applicationKeyId: string;
-  applicationKey: string;
-  bucket: string;
-}
-
-export interface StorjCredentials extends StorageCredentials {
   type: "storj";
   accessKey: string;
   secretKey: string;
@@ -37,14 +8,17 @@ export interface StorjCredentials extends StorageCredentials {
   endpoint?: string;
 }
 
-export type StorageProviderCredentials = S3Credentials | B2Credentials | StorjCredentials;
+export interface StorjCredentials extends StorageCredentials {
+  type: "storj";
+}
+
+export type StorageProviderCredentials = StorjCredentials;
 
 export interface StorageProvider {
   id: string;
   name: string;
-  type: "s3" | "b2" | "storj";
-  config: string; // JSON stringified StorageProviderCredentials
-  status?: string;
+  type: "storj";
+  config: string;
   created_at: string;
   updated_at: string;
 }

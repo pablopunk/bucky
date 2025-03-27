@@ -1,42 +1,21 @@
 import { NextResponse } from "next/server";
 import { createStorageProvider, getStorageProvider, getDatabase } from "@/lib/db";
-import type { StorageProvider, StorageProviderCredentials } from "@/lib/db";
 import { StorageProviderManager } from "@/lib/storage";
 import { z } from "zod";
 import { prepare } from "@/lib/db";
 
-const s3CredentialsSchema = z.object({
-  type: z.literal("s3"),
-  accessKeyId: z.string().min(1),
-  secretAccessKey: z.string().min(1),
-  bucket: z.string().min(1),
-  region: z.string().optional(),
-  endpoint: z.string().optional(),
-});
-
-const b2CredentialsSchema = z.object({
-  type: z.literal("b2"),
-  applicationKeyId: z.string().min(1),
-  applicationKey: z.string().min(1),
-  bucket: z.string().min(1),
-});
-
 const storjCredentialsSchema = z.object({
   type: z.literal("storj"),
+  bucket: z.string().min(1),
   accessKey: z.string().min(1),
   secretKey: z.string().min(1),
-  bucket: z.string().min(1),
   endpoint: z.string().optional().default("https://gateway.storjshare.io"),
 });
 
 const storageProviderSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["s3", "b2", "storj"]),
-  credentials: z.discriminatedUnion("type", [
-    s3CredentialsSchema,
-    b2CredentialsSchema,
-    storjCredentialsSchema,
-  ]),
+  type: z.literal("storj"),
+  credentials: storjCredentialsSchema,
 });
 
 export async function POST(request: Request) {

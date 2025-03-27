@@ -1,0 +1,33 @@
+[2025-03-27T15:06:22.337Z] [LOG] Worker starting backup job from worker data: 19277cf3-9a9e-44a8-b362-c43dd580f71e
+[2025-03-27T15:06:22.338Z] [LOG] Worker starting backup job: 19277cf3-9a9e-44a8-b362-c43dd580f71e
+[2025-03-27T15:06:22.338Z] [LOG] Opening database at: /Users/pablopunk/src/bucky/data/bucky.db
+[2025-03-27T15:06:22.341Z] [LOG] Running backup job: test
+[2025-03-27T15:06:22.341Z] [LOG] Source: /Users/pablopunk/Downloads/compressjpeg
+[2025-03-27T15:06:22.341Z] [LOG] Provider: storj/duplicati (storj)
+[2025-03-27T15:06:22.341Z] [LOG] Created rclone config file at: /var/folders/37/4w4zvcws70j8nxb9gxqzspdc0000gn/T/bucky_rclone_19277cf3-9a9e-44a8-b362-c43dd580f71e.conf
+[2025-03-27T15:06:22.341Z] [LOG] Remote path: storjremote:duplicati/jpegs
+[2025-03-27T15:06:22.341Z] [LOG] Starting backup: rclone sync "/Users/pablopunk/Downloads/compressjpeg/" "storjremote:duplicati/jpegs" --delete-after
+[2025-03-27T15:06:22.342Z] [LOG] Running rclone with args: sync /Users/pablopunk/Downloads/compressjpeg/ storjremote:duplicati/jpegs --config /var/folders/37/4w4zvcws70j8nxb9gxqzspdc0000gn/T/bucky_rclone_19277cf3-9a9e-44a8-b362-c43dd580f71e.conf --delete-after --progress --transfers 16 --fast-list -v
+[2025-03-27T15:06:23.079Z] [LOG] [rclone] 2025/03/27 16:06:23 INFO  : There was nothing to transfer
+Transferred:   	          0 B / 0 B, -, 0 B/s, ETA -
+Checks:                 3 / 3, 100%
+Elapsed time:         0.1s
+[2025-03-27T15:06:23.079Z] [LOG] [rclone] Transferred:   	          0 B / 0 B, -, 0 B/s, ETA -
+Checks:                 3 / 3, 100%
+Elapsed time:         0.1s
+[2025-03-27T15:06:23.080Z] [ERROR] [rclone error] 2025/03/27 16:06:23 INFO  : 
+Transferred:   	          0 B / 0 B, -, 0 B/s, ETA -
+Checks:                 3 / 3, 100%
+Elapsed time:         0.1s
+[2025-03-27T15:06:23.081Z] [LOG] rclone exited with code 0
+[2025-03-27T15:06:23.081Z] [LOG] Backup completed in 0.74 seconds
+[2025-03-27T15:06:23.081Z] [LOG] Files transferred: 0
+[2025-03-27T15:06:23.081Z] [LOG] Files deleted: 0
+[2025-03-27T15:06:23.081Z] [LOG] Errors encountered: 0
+[2025-03-27T15:06:23.081Z] [LOG] Creating backup history entry with ID: 32ff8be5-d84c-4b7d-84fa-8ebb4c2c377c
+[2025-03-27T15:06:23.082Z] [LOG] Backup history entry created successfully
+[2025-03-27T15:06:23.082Z] [LOG] Updating job status to: active
+[2025-03-27T15:06:23.082Z] [LOG] Job status updated to active
+[2025-03-27T15:06:23.082Z] [LOG] Verified job status: active
+[2025-03-27T15:06:23.082Z] [LOG] Removed temporary rclone config file: /var/folders/37/4w4zvcws70j8nxb9gxqzspdc0000gn/T/bucky_rclone_19277cf3-9a9e-44a8-b362-c43dd580f71e.conf
+[2025-03-27T15:06:23.082Z] [LOG] Database connection closed

@@ -4,6 +4,7 @@ import { schema } from "./db/schema"
 import { runMigrations } from "./db/migrations"
 import fs from "fs"
 import logger from "@/lib/logger"
+import { generateUUID } from "./crypto"
 
 // Cache for database connections
 const connections = new Map<number, Database>()
@@ -190,7 +191,7 @@ export function getBackupJob(id: string): BackupJob | undefined {
 // Create a new backup job
 export function createBackupJob(job: Omit<BackupJob, 'id' | 'created_at' | 'updated_at'>): string {
   const db = getDatabase();
-  const id = crypto.randomUUID();
+  const id = generateUUID();
   const now = new Date().toISOString();
   
   try {
@@ -241,7 +242,7 @@ export function getStorageProvider(id: string): StorageProvider | undefined {
 // Create a new storage provider
 export function createStorageProvider(provider: Omit<StorageProvider, 'id' | 'created_at' | 'updated_at'>): string {
   const db = getDatabase();
-  const id = crypto.randomUUID();
+  const id = generateUUID();
   const now = new Date().toISOString();
   
   try {
