@@ -199,93 +199,81 @@ export default function LogsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">All Logs</TabsTrigger>
-          <TabsTrigger value="app">App</TabsTrigger>
-          <TabsTrigger value="app-api">API</TabsTrigger>
-          <TabsTrigger value="app-jobs">Jobs</TabsTrigger>
-          <TabsTrigger value="app-storage">Storage</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeTab} className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card className="md:col-span-1">
-              <CardHeader>
-                <CardTitle>Log Files</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {getFilteredLogFiles().length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground">
-                    No log files found
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {getFilteredLogFiles().map((file) => (
-                      <div
-                        key={file.name}
-                        className={`flex justify-between items-center p-2 rounded cursor-pointer ${
-                          selectedFile === file.name
-                            ? 'bg-primary/10'
-                            : 'hover:bg-muted'
-                        }`}
-                        onClick={() => handleSelectFile(file)}
-                      >
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2" />
-                          <div>
-                            <div className="font-medium">{file.name}</div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-2">
-                              {formatFileSize(file.size)}
-                              {file.isEmpty && (
-                                <Badge variant="outline" className="text-xs">Empty</Badge>
-                              )}
-                            </div>
-                          </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Log Files</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {logFiles.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No log files found
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {logFiles.map((file) => (
+                  <div
+                    key={file.name}
+                    className={`flex justify-between items-center p-2 rounded cursor-pointer ${
+                      selectedFile === file.name
+                        ? 'bg-primary/10'
+                        : 'hover:bg-muted'
+                    }`}
+                    onClick={() => handleSelectFile(file)}
+                  >
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      <div>
+                        <div className="font-medium">{file.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2">
+                          {formatFileSize(file.size)}
+                          {file.isEmpty && (
+                            <Badge variant="outline" className="text-xs">Empty</Badge>
+                          )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation() 
-                            handleDownload(file.name)
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
                       </div>
-                    ))}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation() 
+                        handleDownload(file.name)
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            <Card className="md:col-span-3">
-              <CardHeader>
-                <CardTitle>
-                  {selectedFile ? `Content: ${selectedFile}` : 'Log Content'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!selectedFile ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Select a log file to view its content
-                  </div>
-                ) : logContent ? (
-                  <pre className="bg-muted p-4 rounded-md overflow-auto h-[500px] text-sm">
-                    {renderLogContent(logContent)}
-                  </pre>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500" />
-                    <p>This log file is empty</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+        <Card className="md:col-span-3">
+          <CardHeader>
+            <CardTitle>
+              {selectedFile ? `Content: ${selectedFile}` : 'Log Content'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!selectedFile ? (
+              <div className="text-center py-12 text-muted-foreground">
+                Select a log file to view its content
+              </div>
+            ) : logContent ? (
+              <pre className="bg-muted p-4 rounded-md overflow-auto h-[500px] text-sm">
+                {renderLogContent(logContent)}
+              </pre>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500" />
+                <p>This log file is empty</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 } 
