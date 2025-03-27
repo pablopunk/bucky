@@ -15,6 +15,8 @@ interface BackupStats {
   pausedJobs: number
   successfulBackups: number
   failedBackups: number
+  successPercentChange: number
+  failedPercentChange: number
   nextScheduled: {
     jobName: string
     time: string
@@ -50,6 +52,8 @@ export default function DashboardPage() {
     pausedJobs: 0,
     successfulBackups: 0,
     failedBackups: 0,
+    successPercentChange: 0,
+    failedPercentChange: 0,
     nextScheduled: {
       jobName: "",
       time: "",
@@ -175,7 +179,9 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.successfulBackups}</div>
-                  <p className="text-xs text-muted-foreground">+9% from last week</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.successPercentChange > 0 ? '+' : ''}{stats.successPercentChange}% from last week
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -185,7 +191,9 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.failedBackups}</div>
-                  <p className="text-xs text-muted-foreground">-2% from last week</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.failedPercentChange > 0 ? '+' : ''}{stats.failedPercentChange}% from last week
+                  </p>
                 </CardContent>
               </Card>
               <Card>

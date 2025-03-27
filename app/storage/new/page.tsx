@@ -41,6 +41,7 @@ export default function NewStorageProviderPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testingConnection, setTestingConnection] = useState(false)
 
   const [name, setName] = useState("")
   const [type, setType] = useState<"s3" | "b2" | "storj">("s3")
@@ -50,36 +51,77 @@ export default function NewStorageProviderPage() {
   const [endpoint, setEndpoint] = useState("")
   const [region, setRegion] = useState("")
 
+  // Helper function to build config object based on provider type
+  const buildConfig = () => {
+    if (type === "storj") {
+      return {
+        accessKey,
+        secretKey,
+        bucket,
+        endpoint: endpoint || "https://gateway.storjshare.io",
+      }
+    } else if (type === "s3") {
+      return {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+        bucket,
+        region: region || "us-east-1",
+        endpoint: endpoint || undefined,
+      }
+    } else if (type === "b2") {
+      return {
+        applicationKeyId: accessKey,
+        applicationKey: secretKey,
+        bucket,
+      }
+    }
+    return {}
+  }
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true)
+    setError(null)
+
+    try {
+      const config = buildConfig()
+      
+      // For testing, we need to send all the provider details
+      const response = await fetch("/api/storage/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type,
+          config,
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        toast.success("Connection test successful!")
+      } else {
+        const errorMessage = data.error || "Connection test failed"
+        toast.error(errorMessage)
+        setError(errorMessage)
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Connection test failed"
+      toast.error(errorMessage)
+      setError(errorMessage)
+    } finally {
+      setTestingConnection(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      let config: Record<string, any> = {}
-
-      if (type === "storj") {
-        config = {
-          accessKey,
-          secretKey,
-          bucket,
-          endpoint: endpoint || "https://gateway.storjshare.io",
-        }
-      } else if (type === "s3") {
-        config = {
-          accessKeyId: accessKey,
-          secretAccessKey: secretKey,
-          bucket,
-          region: region || "us-east-1",
-          endpoint: endpoint || undefined,
-        }
-      } else if (type === "b2") {
-        config = {
-          applicationKeyId: accessKey,
-          applicationKey: secretKey,
-          bucket,
-        }
-      }
+      const config = buildConfig()
 
       const response = await fetch("/api/storage", {
         method: "POST",
@@ -89,12 +131,16 @@ export default function NewStorageProviderPage() {
         body: JSON.stringify({
           name,
           type,
-          config,
+          credentials: {
+            type,
+            ...config
+          },
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to create storage provider")
+        const data = await response.json()
+        throw new Error(data.error ? JSON.stringify(data.error) : "Failed to create storage provider")
       }
 
       toast.success("Storage provider created successfully")
@@ -107,203 +153,202 @@ export default function NewStorageProviderPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">New Storage Provider</h1>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
+    <div className="flex min-h-screen w-full flex-col">
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center gap-2">
+          <Link href="/storage">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Back</span>
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight">New Storage Provider</h1>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Type
-          </label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as "s3" | "b2" | "storj")}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          >
-            <option value="s3">Amazon S3</option>
-            <option value="b2">Backblaze B2</option>
-            <option value="storj">Storj</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Bucket
-          </label>
-          <input
-            type="text"
-            value={bucket}
-            onChange={(e) => setBucket(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-        </div>
-
-        {type === "storj" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Access Key
-              </label>
-              <input
-                type="text"
-                value={accessKey}
-                onChange={(e) => setAccessKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Secret Key
-              </label>
-              <input
-                type="password"
-                value={secretKey}
-                onChange={(e) => setSecretKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Endpoint (optional)
-              </label>
-              <input
-                type="text"
-                value={endpoint}
-                onChange={(e) => setEndpoint(e.target.value)}
-                placeholder="https://gateway.storjshare.io"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </>
+        {error && (
+          <div className="bg-destructive/15 text-destructive border border-destructive/20 px-4 py-3 rounded-md mb-4">
+            {error}
+          </div>
         )}
 
-        {type === "s3" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Access Key ID
-              </label>
-              <input
-                type="text"
-                value={accessKey}
-                onChange={(e) => setAccessKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Storage Provider Settings</CardTitle>
+              <CardDescription>Configure your storage provider details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="My Storage Provider"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Secret Access Key
-              </label>
-              <input
-                type="password"
-                value={secretKey}
-                onChange={(e) => setSecretKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="type">Type</Label>
+                <Select value={type} onValueChange={(value) => setType(value as "s3" | "b2" | "storj")}>
+                  <SelectTrigger id="type">
+                    <SelectValue placeholder="Select a provider type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="s3">Amazon S3</SelectItem>
+                    <SelectItem value="b2">Backblaze B2</SelectItem>
+                    <SelectItem value="storj">Storj</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Region
-              </label>
-              <input
-                type="text"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                placeholder="us-east-1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="bucket">Bucket</Label>
+                <Input
+                  id="bucket"
+                  value={bucket}
+                  onChange={(e) => setBucket(e.target.value)}
+                  placeholder="my-bucket"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Endpoint (optional)
-              </label>
-              <input
-                type="text"
-                value={endpoint}
-                onChange={(e) => setEndpoint(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </>
-        )}
+              {type === "storj" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="accessKey">Access Key</Label>
+                    <Input
+                      id="accessKey"
+                      value={accessKey}
+                      onChange={(e) => setAccessKey(e.target.value)}
+                      required
+                    />
+                  </div>
 
-        {type === "b2" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Application Key ID
-              </label>
-              <input
-                type="text"
-                value={accessKey}
-                onChange={(e) => setAccessKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="secretKey">Secret Key</Label>
+                    <Input
+                      id="secretKey"
+                      type="password"
+                      value={secretKey}
+                      onChange={(e) => setSecretKey(e.target.value)}
+                      required
+                    />
+                  </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Application Key
-              </label>
-              <input
-                type="password"
-                value={secretKey}
-                onChange={(e) => setSecretKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-          </>
-        )}
+                  <div className="space-y-2">
+                    <Label htmlFor="endpoint">Endpoint (optional)</Label>
+                    <Input
+                      id="endpoint"
+                      value={endpoint}
+                      onChange={(e) => setEndpoint(e.target.value)}
+                      placeholder="https://gateway.storjshare.io"
+                    />
+                  </div>
+                </>
+              )}
 
-        <div className="flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={() => router.push("/storage")}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {loading ? "Creating..." : "Create Provider"}
-          </button>
-        </div>
-      </form>
+              {type === "s3" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="accessKeyId">Access Key ID</Label>
+                    <Input
+                      id="accessKeyId"
+                      value={accessKey}
+                      onChange={(e) => setAccessKey(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="secretAccessKey">Secret Access Key</Label>
+                    <Input
+                      id="secretAccessKey"
+                      type="password"
+                      value={secretKey}
+                      onChange={(e) => setSecretKey(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="region">Region</Label>
+                    <Input
+                      id="region"
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      placeholder="us-east-1"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Default: us-east-1
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="s3endpoint">Endpoint (optional)</Label>
+                    <Input
+                      id="s3endpoint"
+                      value={endpoint}
+                      onChange={(e) => setEndpoint(e.target.value)}
+                      placeholder="Leave empty for standard AWS S3"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      For S3-compatible services: https://gateway.storjshare.io, https://s3.wasabisys.com, etc.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {type === "b2" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="applicationKeyId">Application Key ID</Label>
+                    <Input
+                      id="applicationKeyId"
+                      value={accessKey}
+                      onChange={(e) => setAccessKey(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="applicationKey">Application Key</Label>
+                    <Input
+                      id="applicationKey"
+                      type="password"
+                      value={secretKey}
+                      onChange={(e) => setSecretKey(e.target.value)}
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="pt-4 flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => router.push("/storage")}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || !accessKey || !secretKey || !bucket}
+                >
+                  {testingConnection ? "Testing..." : "Test Connection"}
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Creating..." : "Create Storage Provider"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
+      </main>
     </div>
   )
 } 

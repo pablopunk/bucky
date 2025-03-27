@@ -4,7 +4,7 @@ globs:
 alwaysApply: true
 ---
 ---
-description: 
+description: Main architecture rules for Bucky Backup Manager
 globs: 
 alwaysApply: true
 ---
@@ -20,7 +20,8 @@ alwaysApply: true
 - **State Management**: React Hooks
 - **Form Handling**: react-hook-form with Zod validation
 - **Notifications**: Sonner for toast notifications
-- **Scheduling**: node-schedule for job scheduling
+- **Scheduling**: Bree job scheduler (built on node-schedule)
+- **Backup Tool**: rclone CLI tool for reliable file transfers
 - **Storage Providers**: AWS S3, Backblaze B2, Storj integration
 - **Logging**: File-based logging system with UI viewer
 
@@ -40,10 +41,12 @@ The application uses SQLite with the following core tables:
 ### File Organization
 - `/app`: Next.js App Router pages and API routes
   - `/api`: Backend API endpoints
-    - `/api/jobs`: Job management endpoints
-    - `/api/storage`: Storage provider endpoints
-    - `/api/logs`: Log retrieval and download endpoints
-  - `/jobs`, `/storage`, `/logs`: Front-end pages
+  - `/jobs`: Job management UI
+  - `/logs`: Log viewing UI
+  - `/storage`: Storage provider management UI
+  - `/reports`: Reporting and statistics UI
+  - `/notifications`: Notification settings UI
+  - `/settings`: Application settings UI
 - `/components`: Reusable React components
   - `/ui`: shadcn/ui components
 - `/lib`: Core business logic
@@ -52,11 +55,12 @@ The application uses SQLite with the following core tables:
   - `/storage`: Storage provider integrations
   - `/jobs`: Job workers for background processing
   - `/logger`: Centralized logging functionality
+  - `/models`: Data models
 
 ### Core Subsystems
 
 #### Backup System
-The backup system uses a custom NodeScheduler built on node-schedule for reliable cron-based job scheduling. It spawns isolated child processes for job execution to prevent database locking issues. The scheduler maintains job state and provides retry mechanisms for failed jobs.
+The backup system uses Bree for reliable job scheduling, built on node-schedule for cron-based job scheduling. It spawns isolated child processes for job execution to prevent database locking issues. The backup operations themselves are executed using rclone, a powerful command-line tool for syncing files across different storage providers.
 
 #### Storage Providers
 The application supports multiple cloud storage providers:
@@ -64,10 +68,10 @@ The application supports multiple cloud storage providers:
 - Backblaze B2
 - Storj distributed storage
 
-Each provider has a standardized interface with specialized implementations for their unique APIs.
+Each provider has a standardized interface with specialized implementations for their unique APIs. The system generates provider-specific rclone configuration files at runtime to connect to these services.
 
 #### Database Layer
-The database uses connection pooling with proper cleanup to handle concurrent access from the web UI and job workers. Migrations ensure proper schema updates over time.
+The database uses connection pooling with proper cleanup to handle concurrent access from the web UI and job workers. The system implements SQLite with WAL mode for better concurrency and reliability.
 
 #### Logging System
 The application uses a centralized logging system that writes to date-based log files. Component-specific loggers (jobs, storage, API) generate separate log files for easier troubleshooting. The Logs UI allows viewing and downloading these log files.
@@ -79,26 +83,27 @@ The application uses a centralized logging system that writes to date-based log 
 - Logs: View application and job logs with download capability
 - Settings: Configure application settings
 - Notifications: Manage email notifications
+- Reports: View backup statistics and status reports
 
 ## Key Implementation Details
 
 ### Job Scheduling
-Uses node-schedule with cron expressions for time-based scheduling. Jobs are persisted in SQLite and survive application restarts. The scheduler checks for missed jobs on startup.
+Uses Bree with node-schedule and cron expressions for time-based scheduling. Jobs are persisted in SQLite and survive application restarts. The scheduler checks for missed jobs on startup.
 
 ### Worker Processes
-Backup jobs run in isolated child processes to prevent database locking and improve reliability. Workers create their own database connections and communicate completion status to the main process. The worker script is self-contained to avoid module loading issues.
+Backup jobs run in isolated child processes to prevent database locking and improve reliability. The worker script uses rclone to execute reliable and efficient file transfers to remote storage providers.
 
 ### Database Connection Management
-Each process maintains its own database connection with proper locking mechanisms to prevent SQLITE_BUSY errors.
+Each process maintains its own database connection with proper locking mechanisms to prevent SQLITE_BUSY errors. The system uses WAL mode for better concurrency.
 
 ### Error Handling
 The system implements comprehensive error handling with retry mechanisms and proper error reporting to the UI and log files.
 
 ### Cloud Storage Integration
-Storage providers are implemented through a provider-agnostic interface with specific adapters for each supported cloud service.
+Storage providers are implemented through a provider-agnostic interface with specific adapters for each supported cloud service. Rclone is used for the actual file transfer operations.
 
 ### Logging
-Logs are stored in the `/logs` directory with daily rotation and component-specific files. The UI displays the most recent 1000 lines while providing an option to download complete log files.
+Logs are stored in the `/logs` directory with daily rotation and component-specific files. The UI displays logs with filtering capabilities while providing an option to download complete log files.
 
 ## Development Workflow
 - `bun run dev`: Development mode
