@@ -110,6 +110,7 @@ export interface Settings {
   enable_logging: boolean;
   log_level: string;
   auto_update_check: boolean;
+  theme?: string;
   created_at: string;
   updated_at: string;
 }
@@ -194,6 +195,7 @@ CREATE TABLE IF NOT EXISTS settings (
   enable_logging BOOLEAN DEFAULT 1,
   log_level TEXT DEFAULT 'info',
   auto_update_check BOOLEAN DEFAULT 1,
+  theme TEXT DEFAULT 'system',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

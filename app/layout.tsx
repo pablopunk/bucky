@@ -74,7 +74,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        <ThemeProvider>
           <div className="flex min-h-screen flex-col md:flex-row bg-background text-foreground">
             <SideNav />
             <div className="flex-1">{children}</div>

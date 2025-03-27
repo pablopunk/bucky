@@ -185,6 +185,7 @@ export interface Settings {
   enable_logging: boolean
   log_level: string
   auto_update_check: boolean
+  theme?: string
   created_at: string
   updated_at: string
 }

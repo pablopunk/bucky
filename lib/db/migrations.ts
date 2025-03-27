@@ -63,6 +63,23 @@ export function runMigrations() {
       console.log('Notification settings table already has email column, skipping migration');
     }
     
+    // Check if the theme column exists in settings table
+    const hasThemeColumn = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('settings') WHERE name='theme'`).get() as ColumnResult;
+    if (hasThemeColumn.count === 0) {
+      console.log('Adding theme column to settings table');
+      db.exec(`ALTER TABLE settings ADD COLUMN theme TEXT DEFAULT 'system';`);
+    }
+    
+    // Create app_config table if it doesn't exist
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS app_config (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
     // Commit transaction
     db.exec('COMMIT;');
     console.log('Database migrations completed successfully');

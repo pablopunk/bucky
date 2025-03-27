@@ -4,7 +4,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { BarChart, Cloud, FileArchive, Home, Mail, Settings } from "lucide-react"
+import { BarChart, Cloud, FileArchive, Home, Mail, Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
 
 const navItems = [
   {
@@ -32,15 +34,25 @@ const navItems = [
     href: "/logs",
     icon: BarChart,
   },
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
 ]
 
 export function SideNav() {
   const pathname = usePathname()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure component is mounted before rendering to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const toggleTheme = () => {
+    if (theme === 'dark') {
+      setTheme('light')
+    } else {
+      setTheme('dark')
+    }
+  }
 
   return (
     <div className="flex h-screen w-16 flex-col items-center border-r border-border bg-card py-4 md:w-60">
@@ -64,6 +76,27 @@ export function SideNav() {
             </Link>
           </Button>
         ))}
+      </div>
+      <div className="px-2 py-4 w-full">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start"
+          onClick={toggleTheme}
+        >
+          {mounted && (
+            theme === 'dark' ? (
+              <>
+                <Sun className="mr-2 h-5 w-5" />
+                <span className="hidden md:inline-block">Light Mode</span>
+              </>
+            ) : (
+              <>
+                <Moon className="mr-2 h-5 w-5" />
+                <span className="hidden md:inline-block">Dark Mode</span>
+              </>
+            )
+          )}
+        </Button>
       </div>
     </div>
   )

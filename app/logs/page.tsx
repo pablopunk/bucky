@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RefreshCw, Download, FileText, AlertTriangle } from "lucide-react"
 import { LoadingState } from "@/components/ui/loading-state"
 import { Badge } from "@/components/ui/badge"
@@ -23,7 +22,6 @@ export default function LogsPage() {
   const [logContent, setLogContent] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(true)
   const [refreshing, setRefreshing] = useState<boolean>(false)
-  const [activeTab, setActiveTab] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState<string>("")
 
   // Function to fetch log files
@@ -108,12 +106,6 @@ export default function LogsPage() {
     } catch (error) {
       console.error("Error downloading log file:", error)
     }
-  }
-
-  // Filter log files based on active tab
-  const getFilteredLogFiles = () => {
-    if (activeTab === "all") return logFiles
-    return logFiles.filter(file => file.name.startsWith(activeTab))
   }
 
   // Filter logs by search query
