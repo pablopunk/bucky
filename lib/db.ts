@@ -42,6 +42,7 @@ export function getDatabase(): Database {
     
     // Cache connection
     connections.set(threadId, db)
+    activeConnections.push(db)
     
     // Initialize schema only once
     if (!schemaInitialized) {
@@ -64,14 +65,12 @@ export function getDatabase(): Database {
     }
   }
   
-  // Track the connection
-  activeConnections.push(connections.get(threadId)!)
-  
+  // Return the cached database connection
   return connections.get(threadId)!
 }
 
 // For compatibility with legacy code patterns that use prepare().run()
-export function prepareStatement(sql: string): { run: (...params: any[]) => void; get: (...params: any[]) => any; all: (...params: any[]) => any[] } {
+export function prepareStatement(sql: string): { run: (...params: any[]) => any; get: (...params: any[]) => any; all: (...params: any[]) => any[] } {
   const db = getDatabase();
   const statement = db.query(sql);
   
@@ -89,6 +88,14 @@ export function closeDatabase(): void {
   if (connections.has(threadId)) {
     try {
       const db = connections.get(threadId)!
+      
+      // Remove from active connections array
+      const index = activeConnections.indexOf(db);
+      if (index !== -1) {
+        activeConnections.splice(index, 1);
+      }
+      
+      // Close the connection
       db.close()
       connections.delete(threadId)
       logger.info(`Closed database connection for thread/process ${threadId}`)
@@ -105,10 +112,21 @@ export function closeAllDatabases(): void {
   let closedCount = 0;
   const errors: Error[] = [];
   
-  for (const db of activeConnections) {
+  // Make a copy of the array since we'll be modifying it while iterating
+  const connectionsToClose = [...activeConnections];
+  
+  for (const db of connectionsToClose) {
     try {
       db.close();
       closedCount++;
+      
+      // Find the thread ID for this connection and remove it from the map
+      for (const [id, conn] of connections.entries()) {
+        if (conn === db) {
+          connections.delete(id);
+          break;
+        }
+      }
     } catch (error) {
       errors.push(error as Error);
       logger.error("Error closing database connection:", { error });

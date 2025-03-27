@@ -307,7 +307,11 @@ export default function JobsPage() {
               <TableBody>
                 {jobs.map((job) => (
                   <TableRow key={job.id}>
-                    <TableCell className="font-medium">{job.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/jobs/${job.id}`} className="hover:underline">
+                        {job.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{job.source_path}</TableCell>
                     <TableCell>{job.schedule}</TableCell>
                     <TableCell>
@@ -461,7 +465,11 @@ export default function JobsPage() {
               <TableBody>
                 {history.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="font-medium">{entry.job_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/jobs/${entry.job_id}`} className="hover:underline">
+                        {entry.job_name}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center">
                         <div

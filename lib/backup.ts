@@ -207,8 +207,26 @@ acl = ${credentials.acl || 'private'}
 
 // Build the rclone command for a backup job
 function buildRcloneCommand(job: any, configFile: string, providerName: string): string {
+  // Format remote path correctly as providerName:bucket/path
+  // Get the provider for bucket info
+  const provider = getStorageProvider(job.storage_provider_id);
+  if (!provider) {
+    throw new Error(`Storage provider ${job.storage_provider_id} not found`);
+  }
+  
+  // Parse provider config to get bucket
+  let credentials;
+  try {
+    credentials = JSON.parse(provider.config);
+  } catch (error) {
+    throw new Error(`Failed to parse storage provider config: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  
+  // Ensure remote path format is correct: providerName:bucket/path
+  const remotePath = `${providerName}:${credentials.bucket}${job.remote_path.startsWith('/') ? job.remote_path : '/' + job.remote_path}`;
+  
   // Base rclone command
-  let command = `rclone sync "${job.source_path}" "${providerName}:${job.remote_path}" --config=${configFile}`;
+  let command = `rclone sync "${job.source_path}" "${remotePath}" --config=${configFile}`;
   
   // Add options based on job settings
   if (job.compression_enabled) {

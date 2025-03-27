@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, CheckCircle, Edit, RefreshCw, StopCircle, Trash, XCircle, Clock, FileArchive } from "lucide-react"
+import { ArrowLeft, CheckCircle, Edit, RefreshCw, StopCircle, Trash, XCircle, Clock, FileArchive, ChevronUp, FileIcon, FolderIcon, FilesIcon, FolderOpenIcon } from "lucide-react"
 import { toast } from "sonner"
 import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { InfoIcon, ShieldAlertIcon, AlertTriangleIcon } from "lucide-react"
 
 interface BackupJob {
   id: string
@@ -38,6 +42,94 @@ interface BackupHistory {
   created_at: string
 }
 
+interface FileSystemItem {
+  name: string
+  type: "directory" | "file"
+  path: string
+  size: number
+  modified: string
+}
+
+interface FileSystemResponse {
+  type: "directory" | "file"
+  path: string
+  parent: string
+  contents?: FileSystemItem[]
+  name?: string
+  size?: number
+  modified?: string
+}
+
+// Component to show detailed access errors
+function RemoteAccessError({ error, onRetry }: { error: string, onRetry: () => void }) {
+  const isAccessDenied = error.includes("Access denied") || error.includes("don't have permission")
+  const isInvalidCredentials = error.includes("Invalid access credentials") || error.includes("does not exist")
+  const isBucketError = error.includes("Bucket") && error.includes("not found")
+  const isConfigError = error.includes("Storage provider") || error.includes("bucket not configured")
+  
+  return (
+    <div className="space-y-4">
+      <Alert variant={isAccessDenied || isInvalidCredentials ? "destructive" : "default"}>
+        {isAccessDenied && <ShieldAlertIcon className="h-4 w-4" />}
+        {isInvalidCredentials && <AlertTriangleIcon className="h-4 w-4" />}
+        {!isAccessDenied && !isInvalidCredentials && <InfoIcon className="h-4 w-4" />}
+        <AlertTitle>
+          {isAccessDenied ? "Access Denied" : 
+           isInvalidCredentials ? "Invalid Credentials" :
+           isBucketError ? "Bucket Not Found" :
+           isConfigError ? "Configuration Error" : "Remote Storage Error"}
+        </AlertTitle>
+        <AlertDescription className="mt-2">
+          {error}
+          
+          <div className="mt-4">
+            <ul className="list-disc pl-5 space-y-1 text-sm">
+              {isAccessDenied && (
+                <>
+                  <li>Verify that your S3 user/role has the correct permissions (s3:ListBucket, s3:GetObject)</li>
+                  <li>Check if the bucket policy allows access to the specified path</li>
+                  <li>Confirm that you're using the correct region for the bucket</li>
+                </>
+              )}
+              {isInvalidCredentials && (
+                <>
+                  <li>Verify your access key and secret key are correct</li>
+                  <li>Check if the credentials have expired or been revoked</li>
+                  <li>Ensure you're using the right storage provider settings</li>
+                </>
+              )}
+              {isBucketError && (
+                <>
+                  <li>Verify the bucket name is spelled correctly</li>
+                  <li>Check if the bucket exists in your account</li>
+                  <li>Make sure you're connecting to the right region</li>
+                </>
+              )}
+              {isConfigError && (
+                <>
+                  <li>Update your storage provider settings with the correct bucket name</li>
+                  <li>Verify all required fields are filled out</li>
+                </>
+              )}
+            </ul>
+          </div>
+        </AlertDescription>
+      </Alert>
+      
+      <div className="flex space-x-4 justify-center">
+        <Button variant="outline" onClick={onRetry}>
+          Try Again
+        </Button>
+        <Link href={`/storage`}>
+          <Button variant="default">
+            Edit Storage Provider
+          </Button>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default function JobDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [job, setJob] = useState<BackupJob | null>(null)
@@ -45,6 +137,18 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  
+  // State for filesystem browsing
+  const [sourceFiles, setSourceFiles] = useState<FileSystemItem[]>([])
+  const [remoteFiles, setRemoteFiles] = useState<FileSystemItem[]>([])
+  const [currentSourcePath, setCurrentSourcePath] = useState<string>("/")
+  const [currentRemotePath, setCurrentRemotePath] = useState<string>("/")
+  const [sourcePathParts, setSourcePathParts] = useState<string[]>([])
+  const [remotePathParts, setRemotePathParts] = useState<string[]>([])
+  const [loadingSource, setLoadingSource] = useState<boolean>(false)
+  const [loadingRemote, setLoadingRemote] = useState<boolean>(false)
+  const [sourceError, setSourceError] = useState<string | null>(null)
+  const [remoteError, setRemoteError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchJob()
@@ -187,6 +291,97 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
     }
   }
 
+  const fetchSourceFiles = async (path: string = "/") => {
+    setLoadingSource(true)
+    setSourceError(null)
+    try {
+      const id = (await params).id;
+      const response = await fetch(`/api/filesystem?type=local&jobId=${id}&path=${encodeURIComponent(path)}`)
+      
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to fetch source files")
+      }
+      
+      const data: FileSystemResponse = await response.json()
+      
+      if (data.type === "directory" && data.contents) {
+        setSourceFiles(data.contents)
+        setCurrentSourcePath(data.path)
+        
+        // Create breadcrumbs
+        const parts = data.path === "/" 
+          ? [] 
+          : data.path.split("/").filter(Boolean)
+        
+        setSourcePathParts(parts)
+      }
+    } catch (err) {
+      setSourceError(err instanceof Error ? err.message : "Failed to fetch source files")
+    } finally {
+      setLoadingSource(false)
+    }
+  }
+  
+  const fetchRemoteFiles = async (path: string = "/") => {
+    setLoadingRemote(true)
+    setRemoteError(null)
+    try {
+      const id = (await params).id;
+      const response = await fetch(`/api/filesystem?type=remote&jobId=${id}&path=${encodeURIComponent(path)}`)
+      
+      if (!response.ok) {
+        const data = await response.json()
+        
+        // Enhanced error handling based on API responses
+        if (data.error) {
+          throw new Error(data.error)
+        }
+        
+        throw new Error("Failed to fetch remote files")
+      }
+      
+      const data: FileSystemResponse = await response.json()
+      
+      if (data.type === "directory" && data.contents) {
+        setRemoteFiles(data.contents)
+        setCurrentRemotePath(data.path)
+        
+        // Create breadcrumbs
+        const parts = data.path === "/" 
+          ? [] 
+          : data.path.split("/").filter(Boolean)
+        
+        setRemotePathParts(parts)
+      }
+    } catch (err) {
+      setRemoteError(err instanceof Error ? err.message : "Failed to fetch remote files")
+    } finally {
+      setLoadingRemote(false)
+    }
+  }
+  
+  const navigateToSourcePath = (path: string) => {
+    fetchSourceFiles(path)
+  }
+  
+  const navigateToRemotePath = (path: string) => {
+    fetchRemoteFiles(path)
+  }
+  
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+  
+  useEffect(() => {
+    if (job && !loading) {
+      // Only load source/remote files when job details are loaded and user clicks the tabs
+    }
+  }, [job])
+
   if (loading) {
     return <LoadingState message="Loading data..." />
   }
@@ -283,7 +478,8 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
         <Tabs defaultValue="history" className="space-y-4">
           <TabsList>
             <TabsTrigger value="history">Backup History</TabsTrigger>
-            <TabsTrigger value="settings">Job Settings</TabsTrigger>
+            <TabsTrigger value="source" onClick={() => fetchSourceFiles()}>Browse Source</TabsTrigger>
+            <TabsTrigger value="remote" onClick={() => fetchRemoteFiles()}>Browse Remote</TabsTrigger>
           </TabsList>
           
           <TabsContent value="history">
@@ -327,39 +523,229 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
             </Card>
           </TabsContent>
           
-          <TabsContent value="settings">
+          <TabsContent value="source">
             <Card>
               <CardHeader>
-                <CardTitle>Job Settings</CardTitle>
-                <CardDescription>Configuration details for this backup job</CardDescription>
+                <CardTitle>Browse Source Files</CardTitle>
+                <CardDescription>Explore the local source directory</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium">Job Name</h3>
-                    <p>{job.name}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium">Source Path</h3>
-                    <p>{job.source_path}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium">Remote Path</h3>
-                    <p>{job.remote_path}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium">Schedule</h3>
-                    <p>{job.schedule}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium">Created</h3>
-                    <p>{formatDate(job.created_at)}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium">Last Updated</h3>
-                    <p>{formatDate(job.updated_at)}</p>
-                  </div>
+                <div className="flex items-center mb-4">
+                  <Breadcrumb className="flex-1">
+                    <BreadcrumbList>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink href="#" onClick={() => navigateToSourcePath("/")}>
+                          <FolderIcon className="h-4 w-4 mr-1" />
+                          Source
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      
+                      {sourcePathParts.map((part, index) => {
+                        const path = `/${sourcePathParts.slice(0, index + 1).join("/")}`
+                        return (
+                          <BreadcrumbItem key={path}>
+                            <BreadcrumbSeparator>/</BreadcrumbSeparator>
+                            <BreadcrumbLink href="#" onClick={() => navigateToSourcePath(path)}>
+                              {part}
+                            </BreadcrumbLink>
+                          </BreadcrumbItem>
+                        )
+                      })}
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                  
+                  <Button variant="outline" size="sm" onClick={() => {
+                    const parentPath = currentSourcePath === "/" 
+                      ? "/"
+                      : `/${sourcePathParts.slice(0, sourcePathParts.length - 1).join("/")}`
+                    navigateToSourcePath(parentPath)
+                  }} disabled={currentSourcePath === "/"}>
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Up
+                  </Button>
                 </div>
+                
+                {loadingSource && <LoadingState message="Loading files..." />}
+                
+                {sourceError && <ErrorState error={sourceError} onRetry={() => fetchSourceFiles(currentSourcePath)} />}
+                
+                {!loadingSource && !sourceError && (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Size</TableHead>
+                          <TableHead>Modified</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sourceFiles.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No files found in this directory
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          sourceFiles.map((file) => (
+                            <TableRow key={file.path}>
+                              <TableCell>
+                                {file.type === "directory" ? (
+                                  <button 
+                                    className="flex items-center hover:underline"
+                                    onClick={() => navigateToSourcePath(file.path)}
+                                  >
+                                    <FolderIcon className="h-4 w-4 mr-2 text-blue-500" />
+                                    {file.name}
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center">
+                                    <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
+                                    {file.name}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {file.type === "directory" ? "—" : formatFileSize(file.size)}
+                              </TableCell>
+                              <TableCell>
+                                {new Date(file.modified).toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="remote">
+            <Card>
+              <CardHeader>
+                <CardTitle>Browse Remote Files</CardTitle>
+                <CardDescription>Explore the remote backup destination</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center mb-4">
+                  <Breadcrumb className="flex-1">
+                    <BreadcrumbList>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink href="#" onClick={() => navigateToRemotePath("/")}>
+                          <FolderIcon className="h-4 w-4 mr-1" />
+                          Remote
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      
+                      {remotePathParts.map((part, index) => {
+                        const path = `/${remotePathParts.slice(0, index + 1).join("/")}`
+                        return (
+                          <BreadcrumbItem key={path}>
+                            <BreadcrumbSeparator>/</BreadcrumbSeparator>
+                            <BreadcrumbLink href="#" onClick={() => navigateToRemotePath(path)}>
+                              {part}
+                            </BreadcrumbLink>
+                          </BreadcrumbItem>
+                        )
+                      })}
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                  
+                  <Button variant="outline" size="sm" onClick={() => {
+                    const parentPath = currentRemotePath === "/" 
+                      ? "/"
+                      : `/${remotePathParts.slice(0, remotePathParts.length - 1).join("/")}`
+                    navigateToRemotePath(parentPath)
+                  }} disabled={currentRemotePath === "/"}>
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Up
+                  </Button>
+                </div>
+                
+                {loadingRemote && <LoadingState message="Loading files..." />}
+                
+                {remoteError && <RemoteAccessError error={remoteError} onRetry={() => fetchRemoteFiles(currentRemotePath)} />}
+                
+                {!loadingRemote && !remoteError && (
+                  <div className="rounded-md border">
+                    <div className="p-2 border-b flex justify-between items-center">
+                      <div className="text-sm text-muted-foreground">
+                        Testing remote connection to <code>bucket: {job?.remote_path.split('/')[1] || 'root'}</code>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={async () => {
+                          try {
+                            setLoadingRemote(true);
+                            const id = (await params).id;
+                            const response = await fetch(`/api/filesystem?type=remote&jobId=${id}&path=/&debug=true`);
+                            const data = await response.json();
+                            if (!response.ok) {
+                              throw new Error(data.error || 'Connection test failed');
+                            }
+                            toast.success('Connection successful!');
+                            fetchRemoteFiles('/');
+                          } catch (err) {
+                            toast.error(`Connection failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                            setRemoteError(err instanceof Error ? err.message : 'Connection test failed');
+                          } finally {
+                            setLoadingRemote(false);
+                          }
+                        }}
+                      >
+                        Test Connection
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Size</TableHead>
+                          <TableHead>Modified</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {remoteFiles.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No files found in this directory
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          remoteFiles.map((file) => (
+                            <TableRow key={file.path}>
+                              <TableCell>
+                                {file.type === "directory" ? (
+                                  <button 
+                                    className="flex items-center hover:underline"
+                                    onClick={() => navigateToRemotePath(file.path)}
+                                  >
+                                    <FolderIcon className="h-4 w-4 mr-2 text-blue-500" />
+                                    {file.name}
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center">
+                                    <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
+                                    {file.name}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {file.type === "directory" ? "—" : formatFileSize(file.size)}
+                              </TableCell>
+                              <TableCell>
+                                {new Date(file.modified).toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

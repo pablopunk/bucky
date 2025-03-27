@@ -31,7 +31,7 @@ interface BackupJob {
   last_run?: string | null
 }
 
-export default function EditBackupJobPage({ params }: { params: { id: string } }) {
+export default function EditBackupJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const [providers, setProviders] = useState<StorageProvider[]>([])
   const [loading, setLoading] = useState(true)
