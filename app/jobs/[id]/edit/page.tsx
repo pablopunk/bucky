@@ -1,41 +1,35 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Folder, HelpCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
+import { ArrowLeft, Folder } from "lucide-react"
 
 interface StorageProvider {
   id: string
   name: string
-  type: "s3" | "b2" | "storj"
-  credentials: {
-    endpoint: string
-    accessKey: string
-    secretKey: string
-  }
-  createdAt: string
-  updatedAt: string
+  type: string
 }
 
 interface BackupJob {
+  id: string
   name: string
-  sourcePath: string
-  storageProviderId: string
+  source_path: string
+  storage_provider_id: string
   schedule: string
-  remotePath: string
+  remote_path: string
+  status: string
 }
 
-export default function NewBackupJobPage() {
+export default function EditBackupJobPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [providers, setProviders] = useState<StorageProvider[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,11 +38,12 @@ export default function NewBackupJobPage() {
   const [jobName, setJobName] = useState("")
   const [sourcePath, setSourcePath] = useState("")
   const [remotePath, setRemotePath] = useState("")
-  const [cronExpression, setCronExpression] = useState("0 0 * * *")
+  const [cronExpression, setCronExpression] = useState("")
   const [storageProviderId, setStorageProviderId] = useState("")
 
   useEffect(() => {
     fetchProviders()
+    fetchJob()
   }, [])
 
   const fetchProviders = async () => {
@@ -61,47 +56,54 @@ export default function NewBackupJobPage() {
       setProviders(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
-    } finally {
-      setLoading(false)
     }
   }
 
-  const createJob = async (job: BackupJob) => {
+  const fetchJob = async () => {
     try {
-      const response = await fetch("/api/jobs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(job),
-      })
-
+      const response = await fetch(`/api/jobs/${params.id}`)
       if (!response.ok) {
-        throw new Error("Failed to create backup job")
+        throw new Error("Failed to fetch backup job")
       }
-
-      const data = await response.json()
-      return data
+      const job: BackupJob = await response.json()
+      
+      setJobName(job.name)
+      setSourcePath(job.source_path)
+      setRemotePath(job.remote_path)
+      setCronExpression(job.schedule)
+      setStorageProviderId(job.storage_provider_id)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
-      throw err
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await createJob({
-        name: jobName,
-        sourcePath,
-        storageProviderId,
-        schedule: cronExpression,
-        remotePath,
+      const response = await fetch(`/api/jobs/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: jobName,
+          sourcePath: sourcePath,
+          storageProviderId: storageProviderId,
+          schedule: cronExpression,
+          remotePath: remotePath,
+        }),
       })
-      toast.success("Backup job created successfully")
+
+      if (!response.ok) {
+        throw new Error("Failed to update backup job")
+      }
+
+      toast.success("Backup job updated successfully")
       router.push("/jobs")
     } catch (error) {
-      toast.error("Failed to create backup job")
+      toast.error("Failed to update backup job")
     }
   }
 
@@ -123,12 +125,13 @@ export default function NewBackupJobPage() {
               <span className="sr-only">Back</span>
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight">Create New Backup Job</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Edit Backup Job</h1>
         </div>
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-1">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="basic">Settings</TabsTrigger>
+              <TabsTrigger value="notifications">Notifications</TabsTrigger>
             </TabsList>
             <TabsContent value="basic">
               <Card>
@@ -250,16 +253,28 @@ export default function NewBackupJobPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+            <TabsContent value="notifications">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notifications</CardTitle>
+                  <CardDescription>Configure email notifications for your backup job</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Email notifications are not yet supported.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
           <div className="mt-4 flex justify-end gap-2">
             <Link href="/jobs">
               <Button variant="outline">Cancel</Button>
             </Link>
-            <Button type="submit">Create Backup Job</Button>
+            <Button type="submit">Update Backup Job</Button>
           </div>
         </form>
       </main>
     </div>
   )
-}
-
+} 

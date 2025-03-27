@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  bucky:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data  # For persistent storage of SQLite database
+      - ./backups:/app/backups  # For local file backups
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped 
