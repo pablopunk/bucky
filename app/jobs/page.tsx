@@ -36,7 +36,7 @@ interface BackupHistory {
   id: string
   job_id: string
   job_name: string
-  status: "success" | "failed"
+  status: "success" | "failed" | "running"
   start_time: string
   end_time: string | null
   size: number | null
@@ -485,13 +485,19 @@ export default function JobsPage() {
                       <div className="flex items-center">
                         <div
                           className={`mr-2 h-2 w-2 rounded-full ${
-                            entry.status === "success" ? "bg-green-500" : "bg-red-500"
+                            entry.status === "success" ? "bg-green-500" :
+                            entry.status === "running" ? "bg-orange-500" :
+                            entry.status === "failed" ? "bg-red-500" :
+                            "bg-gray-500"
                           }`}
                         />
                         {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-normal max-w-md">{entry.message || "-"}</TableCell>
+                    <TableCell className="whitespace-normal max-w-md overflow-hidden">
+                    <div className="max-h-20 overflow-y-auto">
+                      {entry.message || "-"}</div>
+                    </TableCell>
                     <TableCell>{new Date(entry.created_at).toLocaleString()}</TableCell>
                   </TableRow>
                 ))}

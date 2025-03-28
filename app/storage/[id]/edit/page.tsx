@@ -36,7 +36,6 @@ export default function EditStorageProviderPage({ params }: { params: Promise<{ 
   const [accessKey, setAccessKey] = useState("")
   const [secretKey, setSecretKey] = useState("")
   const [endpoint, setEndpoint] = useState("")
-  const [region, setRegion] = useState("")
   const [nameError, setNameError] = useState<string | null>(null)
 
   const validateName = (value: string): boolean => {
@@ -57,7 +56,7 @@ export default function EditStorageProviderPage({ params }: { params: Promise<{ 
 
   useEffect(() => {
     fetchProvider()
-  }, [params])
+  }, [])
 
   const fetchProvider = async () => {
     try {
@@ -80,7 +79,6 @@ export default function EditStorageProviderPage({ params }: { params: Promise<{ 
       } else if (data.type === "s3") {
         setAccessKey(config.accessKeyId)
         setSecretKey(config.secretAccessKey)
-        setRegion(config.region || "")
         setEndpoint(config.endpoint || "")
       } else if (data.type === "b2") {
         setAccessKey(config.applicationKeyId)
