@@ -61,3 +61,4 @@ volumes:
   - [ ] B2
   - [ ] SFTP
 - [ ] Restore functionality (pull the remote content into the local folder)
+- [ ] Async execution of jobs (streaming stdout on execa). Create a job.progress prop that will be constantly updated by the rclone stdout and can be shown on the jobs page
