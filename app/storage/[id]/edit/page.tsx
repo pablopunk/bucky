@@ -24,7 +24,7 @@ interface StorageProvider {
   updated_at: string
 }
 
-export default function EditStorageProviderPage({ params }: { params: { id: string } }) {
+export default function EditStorageProviderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,11 +40,12 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
 
   useEffect(() => {
     fetchProvider()
-  }, [params.id])
+  }, [params])
 
   const fetchProvider = async () => {
     try {
-      const response = await fetch(`/api/storage?id=${params.id}`)
+      const { id } = await params
+      const response = await fetch(`/api/storage?id=${id}`)
       if (!response.ok) {
         throw new Error("Failed to fetch storage provider")
       }
@@ -92,7 +93,8 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
     }
 
     try {
-      const response = await fetch(`/api/storage?id=${params.id}`, {
+      const { id } = await params
+      const response = await fetch(`/api/storage?id=${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -163,7 +165,12 @@ export default function EditStorageProviderPage({ params }: { params: { id: stri
               <div className="space-y-2">
                 <Label htmlFor="type">Provider Type</Label>
                 <Select value={type} onValueChange={(value: "storj") => setType(value)}>
-                  <SelectItem value="storj">Storj DCS</SelectItem>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="storj">Storj DCS</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
 

@@ -671,9 +671,6 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
                 {!loadingRemote && !remoteError && (
                   <div className="rounded-md border">
                     <div className="p-2 border-b flex justify-between items-center">
-                      <div className="text-sm text-muted-foreground">
-                        Testing remote connection to <code>bucket: {job?.remote_path.split('/')[1] || 'root'}</code>
-                      </div>
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -696,7 +693,7 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
                           }
                         }}
                       >
-                        Test Connection
+                        Refresh
                       </Button>
                     </div>
                     <Table>

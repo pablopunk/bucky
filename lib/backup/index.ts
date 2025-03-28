@@ -6,7 +6,6 @@ import { StorageProviderManager } from '../storage';
 // Export other backup-related functionality
 export * from './scheduler';
 export * from './engine';
-export * from './service';
 export * from './bree-scheduler';
 export * from './node-scheduler';
 

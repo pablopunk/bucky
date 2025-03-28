@@ -4,6 +4,10 @@ interface ColumnResult {
   count: number;
 }
 
+interface VersionResult {
+  version: number;
+}
+
 /**
  * Run database migrations to ensure latest schema
  */
@@ -19,6 +23,106 @@ export function runMigrations() {
   db.exec('BEGIN TRANSACTION;');
   
   try {
+    // Keep track of the current version for the database
+    // Table to track migrations
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS db_migrations (
+        id INTEGER PRIMARY KEY,
+        version INTEGER NOT NULL,
+        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Get the current version
+    let currentVersion = 0;
+    try {
+      const versionRow = db.query('SELECT MAX(version) as version FROM db_migrations').get() as VersionResult;
+      if (versionRow && versionRow.version) {
+        currentVersion = versionRow.version;
+      }
+    } catch (error) {
+      console.error('Error getting database version:', error);
+      // Continue with migrations, assuming version 0
+    }
+    
+    // Helper function to update version
+    const updateVersion = (version: number) => {
+      db.query('INSERT INTO db_migrations (version) VALUES (?)').run(version);
+      currentVersion = version;
+      console.log(`Database migrated to version ${version}`);
+    };
+
+    // Migration 1: Add compression_level
+    if (currentVersion < 1) {
+      try {
+        // Check if the compression_level column exists
+        const hasCompressionLevel = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_level'`).get() as ColumnResult;
+        if (hasCompressionLevel.count === 0) {
+          console.log('Adding compression_level column to backup_jobs table');
+          db.exec(`ALTER TABLE backup_jobs ADD COLUMN compression_level INTEGER NOT NULL DEFAULT 6;`);
+        }
+        updateVersion(1);
+      } catch (error) {
+        console.error('Migration 1 failed:', error);
+      }
+    }
+    
+    // Migration 2: Remove compression
+    if (currentVersion < 2) {
+      try {
+        // We can't remove columns in SQLite, but we can set defaults to make them harmless
+        console.log('Setting compression_enabled to 0 and compression_level to 0 for all jobs');
+        
+        // Check if compression_enabled column exists
+        const hasCompressionEnabled = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_enabled'`).get() as ColumnResult;
+        if (hasCompressionEnabled.count > 0) {
+          // Set all compression_enabled to 0
+          db.exec(`UPDATE backup_jobs SET compression_enabled = 0`);
+        }
+        
+        // Check if compression_level column exists
+        const hasCompressionLevel = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_level'`).get() as ColumnResult;
+        if (hasCompressionLevel.count > 0) {
+          // Set all compression_level to 0
+          db.exec(`UPDATE backup_jobs SET compression_level = 0`);
+        }
+        
+        updateVersion(2);
+      } catch (error) {
+        console.error('Migration 2 failed:', error);
+      }
+    }
+
+    // Migration 3: Add compression_enabled if it doesn't exist
+    if (currentVersion < 3) {
+      try {
+        // Check if compression_enabled column exists
+        const hasCompressionEnabled = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_enabled'`).get() as ColumnResult;
+        if (hasCompressionEnabled.count === 0) {
+          console.log('Adding compression_enabled column to backup_jobs table');
+          db.exec(`ALTER TABLE backup_jobs ADD COLUMN compression_enabled BOOLEAN DEFAULT 0;`);
+        }
+        updateVersion(3);
+      } catch (error) {
+        console.error('Migration 3 failed:', error);
+      }
+    }
+
+    // Migration 4: Add retention_period to backup_jobs
+    if (currentVersion < 4) {
+      try {
+        // Check if retention_period column exists in backup_jobs
+        const hasRetentionPeriod = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='retention_period'`).get() as ColumnResult;
+        if (hasRetentionPeriod.count === 0) {
+          console.log('Adding retention_period column to backup_jobs table');
+          db.exec(`ALTER TABLE backup_jobs ADD COLUMN retention_period INTEGER NULL;`);
+        }
+        updateVersion(4);
+      } catch (error) {
+        console.error('Migration 4 failed:', error);
+      }
+    }
+
     // Add next_run column if it doesn't exist
     const hasNextRun = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='next_run'`).get() as ColumnResult;
     if (hasNextRun.count === 0) {
@@ -38,13 +142,6 @@ export function runMigrations() {
     if (hasRemotePath.count === 0) {
       console.log('Adding remote_path column to backup_jobs table');
       db.exec(`ALTER TABLE backup_jobs ADD COLUMN remote_path TEXT NOT NULL DEFAULT '/';`);
-    }
-    
-    // Add compression_level column if it doesn't exist
-    const hasCompressionLevel = db.query(`SELECT COUNT(*) as count FROM pragma_table_info('backup_jobs') WHERE name='compression_level'`).get() as ColumnResult;
-    if (hasCompressionLevel.count === 0) {
-      console.log('Adding compression_level column to backup_jobs table');
-      db.exec(`ALTER TABLE backup_jobs ADD COLUMN compression_level INTEGER NOT NULL DEFAULT 6;`);
     }
     
     // Run migration for notification_settings if the email column doesn't exist

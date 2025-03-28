@@ -127,9 +127,6 @@ export interface BackupJob {
   schedule: string
   storage_provider_id: string
   remote_path: string
-  retention_period: number | null
-  compression_enabled: boolean
-  compression_level: number
   status: "active" | "paused" | "failed" | "in_progress"
   next_run: string | null
   last_run: string | null
@@ -251,18 +248,15 @@ export function createBackupJob(data: Omit<BackupJob, "id" | "created_at" | "upd
   db.query(
     `INSERT INTO backup_jobs (
       id, name, source_path, storage_provider_id, schedule,
-      retention_period, compression_enabled, compression_level, status,
-      next_run, last_run, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      remote_path, status, next_run, last_run, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     data.name,
     data.source_path,
     data.storage_provider_id,
     data.schedule,
-    data.retention_period || null,
-    data.compression_enabled ? 1 : 0,
-    data.compression_level,
+    data.remote_path,
     data.status,
     data.next_run || null,
     data.last_run || null,

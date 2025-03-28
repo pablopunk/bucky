@@ -23,19 +23,30 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validatedData = storageProviderSchema.parse(body);
 
-    // Validate credentials by attempting to create a provider
+    // Validate credentials by attempting to create a provider and test connection
     const manager = new StorageProviderManager();
-    manager.create(validatedData.credentials);
-
-    // If validation succeeds, save to database
-    const id = createStorageProvider({
-      name: validatedData.name,
-      type: validatedData.type,
-      config: JSON.stringify(validatedData.credentials),
-    });
-
-    return NextResponse.json({ id });
+    
+    try {
+      // Use createStorageProvider which validates the connection
+      const id = await manager.createStorageProvider(
+        validatedData.name,
+        validatedData.type,
+        validatedData.credentials
+      );
+      
+      return NextResponse.json({ id });
+    } catch (error) {
+      console.error("Storage provider validation error:", error);
+      if (error instanceof Error) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
   } catch (error) {
+    console.error("Storage provider creation error:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
@@ -92,24 +103,26 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const validatedData = storageProviderSchema.parse(body);
 
-    // Validate credentials by attempting to create a provider
+    // Update the provider using the manager
     const manager = new StorageProviderManager();
-    manager.create(validatedData.credentials);
-
-    // If validation succeeds, update in database
-    const db = getDatabase();
-    prepare(
-      `UPDATE storage_providers 
-       SET name = ?, type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    ).run(
-      validatedData.name,
-      validatedData.type,
-      JSON.stringify(validatedData.credentials),
-      id
-    );
-
-    return NextResponse.json({ success: true });
+    
+    try {
+      await manager.updateStorageProvider(id, {
+        name: validatedData.name,
+        config: validatedData.credentials
+      });
+      
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error("Storage provider update error:", error);
+      if (error instanceof Error) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
@@ -134,8 +147,8 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const db = getDatabase();
-    prepare(`DELETE FROM storage_providers WHERE id = ?`).run(id);
+    const manager = new StorageProviderManager();
+    await manager.deleteStorageProvider(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

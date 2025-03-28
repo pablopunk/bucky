@@ -1,9 +1,7 @@
-FROM oven/bun:1 as builder
+FROM oven/bun:1 AS builder
 
 # Set timezone
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo UTC > /etc/timezone
-
-# We don't need build dependencies anymore with Bun's SQLite
 
 WORKDIR /app
 
@@ -20,6 +18,12 @@ COPY . .
 RUN bun run build
 
 FROM oven/bun:1
+
+# We need rclone on the server, not the builder image
+RUN apt update && apt install -y \
+    rclone \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

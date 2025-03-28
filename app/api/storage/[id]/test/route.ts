@@ -4,14 +4,26 @@ import type { StorageProvider } from "@/lib/db"
 import { StorageProviderManager } from "@/lib/storage"
 import { storageLogger } from "@/lib/logger"
 
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Redirect GET requests to use POST instead
+  const { id } = params;
+  return NextResponse.json(
+    { success: false, error: "Please use POST method for testing connections" },
+    { status: 405 }
+  )
+}
+
 export async function POST(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
-  storageLogger.info("Test connection request received for provider:", context.params)
-
   try {
-    const id = (await context.params).id;
+    const { id } = params;
+    storageLogger.info("Test connection request received for provider:", { id })
+
     // Get storage provider from database
     const db = getDatabase()
     const provider = db.prepare(
@@ -29,15 +41,9 @@ export async function POST(
     // Initialize storage provider manager and get provider instance
     const manager = new StorageProviderManager()
     
-    // Create provider instance with config
-    const config = JSON.parse(provider.config)
-    const storageProvider = manager.create({
-      type: provider.type as "s3" | "b2" | "storj",
-      ...config
-    })
-
-    // Test connection by trying to list the root directory
     try {
+      // Get the provider and test connection by listing the root directory
+      const storageProvider = await manager.getProvider(id)
       storageLogger.info("Testing connection to storage provider", { id, type: provider.type })
       await storageProvider.list("/")
       storageLogger.info("Connection test successful", { id })
@@ -50,7 +56,8 @@ export async function POST(
       )
     }
   } catch (error) {
-    storageLogger.error("Error testing storage provider:", error)
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    storageLogger.error("Error testing storage provider:", { error: errorMessage })
     return NextResponse.json(
       { success: false, error: "Failed to test storage provider" },
       { status: 500 }

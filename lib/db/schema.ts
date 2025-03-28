@@ -79,7 +79,6 @@ export interface Settings {
   data_directory: string;
   backup_directory: string;
   max_concurrent_jobs: number;
-  retention_period: number;
   compression_level: number;
   enable_logging: boolean;
   log_level: string;
@@ -164,7 +163,6 @@ CREATE TABLE IF NOT EXISTS settings (
   data_directory TEXT NOT NULL,
   backup_directory TEXT NOT NULL,
   max_concurrent_jobs INTEGER DEFAULT 3,
-  retention_period INTEGER DEFAULT 30,
   compression_level INTEGER DEFAULT 6,
   enable_logging BOOLEAN DEFAULT 1,
   log_level TEXT DEFAULT 'info',

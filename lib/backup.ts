@@ -1,14 +1,10 @@
 import { jobLogger } from "@/lib/logger"
 import { getBackupJob, getDatabase, getStorageProvider } from "@/lib/db"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { execa } from "execa"
 import path from "path"
 import fs from "fs"
 import nodemailer from "nodemailer"
 import { generateUUID } from "./crypto"
-
-// Promisify exec for async/await usage
-const execAsync = promisify(exec);
 
 // Define a type for the Bree scheduler
 interface BreeScheduler {
@@ -187,7 +183,10 @@ provider = Storj
 access_key_id = ${credentials.accessKey}
 secret_access_key = ${credentials.secretKey}
 endpoint = ${credentials.endpoint || 'https://gateway.storjshare.io'}
+location_constraint = 
 acl = ${credentials.acl || 'private'}
+no_check_certificate = true
+force_path_style = true
 `;
     } else {
       throw new Error(`Unsupported provider type: ${provider.type}`);
@@ -206,7 +205,7 @@ acl = ${credentials.acl || 'private'}
 }
 
 // Build the rclone command for a backup job
-function buildRcloneCommand(job: any, configFile: string, providerName: string): string {
+function buildRcloneCommand(job: any, configFile: string, providerName: string): [string, string[]] {
   // Format remote path correctly as providerName:bucket/path
   // Get the provider for bucket info
   const provider = getStorageProvider(job.storage_provider_id);
@@ -226,17 +225,29 @@ function buildRcloneCommand(job: any, configFile: string, providerName: string):
   const remotePath = `${providerName}:${credentials.bucket}${job.remote_path.startsWith('/') ? job.remote_path : '/' + job.remote_path}`;
   
   // Base rclone command
-  let command = `rclone sync "${job.source_path}" "${remotePath}" --config=${configFile}`;
+  const command = "rclone"
+  const args = [
+    'sync',
+    job.source_path,
+    remotePath,
+    `--config=${configFile}`,
+    '-v'
+  ]
+  
+  const noCheckCertificate = false;
+  if (noCheckCertificate) {
+    args.push('--no-check-certificate')
+  }
   
   // Add options based on job settings
   if (job.compression_enabled) {
-    command += ` --compress-level=${job.compression_level || 6}`;
+    args.push(`--compress-level=${job.compression_level || 6}`)
   }
   
   // Add common options
-  command += ` --progress --stats=1s --log-level=INFO`;
+  args.push('--progress', '--stats=1s')
   
-  return command;
+  return [command, args];
 }
 
 // Run a specific backup job
@@ -293,12 +304,20 @@ export async function runBackupJob(jobId: string) {
     }
     
     // Build the rclone command
-    const command = buildRcloneCommand(job, configFile, provider.name);
-    jobLogger.info(`Running rclone command: ${command}`);
+    const [command, args] = buildRcloneCommand(job, configFile, provider.name);
+    jobLogger.info(`Running rclone command: ${command} ${args.join(' ')}`);
     
     // Execute the rclone command
-    const { stdout, stderr } = await execAsync(command);
+    const { stdout, stderr, failed, message, exitCode } = await execa(command, args);
     
+    // Still log the output to the console
+    stdout.split('\n').forEach(line => jobLogger.info(line))
+    stderr.split('\n').forEach(line => jobLogger.info(line))
+    
+    if (failed || exitCode !== 0) {
+        throw new Error(`Rclone command failed: ${message} ${stderr}`)
+    }
+
     // Parse output to get size and other stats
     const sizeMatch = stdout.match(/Transferred:\s+([0-9.]+\s+[A-Za-z]+)/i);
     const sizeStr = sizeMatch ? sizeMatch[1] : '0 Bytes';

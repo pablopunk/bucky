@@ -7,7 +7,8 @@
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "bun --bun next lint",
-    "docker:start": "docker-compose build --no-cache && docker-compose up -d"
+    "docker:start": "docker-compose build && docker-compose up -d",
+    "docker:start:force": "docker-compose build --no-cache && docker-compose up -d"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.775.0",
@@ -51,11 +52,13 @@
     "cron-parser": "2.3.0",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
+    "execa": "^9.5.2",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "15.1.0",
     "next-themes": "latest",
     "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
     "node-schedule": "^2.1.1",
     "nodemailer": "^6.10.0",
     "p-retry": "^6.2.1",

@@ -17,9 +17,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-volumes:
-  bucky-data:
-    driver: local
-  bucky-logs:
-    driver: local

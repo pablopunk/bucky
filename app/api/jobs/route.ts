@@ -13,9 +13,6 @@ const backupJobSchema = z.object({
   storageProviderId: z.string().min(1),
   schedule: z.string().min(1),
   remotePath: z.string().min(1),
-  retentionPeriod: z.number().min(1).optional(),
-  compressionEnabled: z.boolean().optional().default(true),
-  compressionLevel: z.number().min(0).max(9).default(6),
   notifications: z.boolean().optional().default(true),
 });
 
@@ -67,10 +64,7 @@ export async function POST(request: Request) {
            WHERE id = ?`
         ).run(new Date().toISOString(), jobId);
 
-        // Reload the scheduler to ensure the job gets properly scheduled
-        const scheduler = getBreeScheduler();
-        await scheduler.loadJobs();
-
+        // No need to reload the scheduler
         return NextResponse.json({ success: true });
       }
 
@@ -153,21 +147,13 @@ export async function POST(request: Request) {
       storage_provider_id: validatedData.storageProviderId,
       schedule: validatedData.schedule,
       remote_path: validatedData.remotePath,
-      retention_period: validatedData.retentionPeriod || null,
-      compression_enabled: validatedData.compressionEnabled,
-      compression_level: validatedData.compressionLevel,
       status: "active" as const,
       next_run: null,
       last_run: null
     });
 
-    // Schedule the job using the Bree scheduler
-    const scheduler = getBreeScheduler();
-    
-    // Reload jobs in the scheduler to pick up the new job
-    await scheduler.loadJobs();
-    
-    console.log(`New job ${newJobId} created and scheduler reloaded`);
+    // No need to explicitly load the job - the scheduler will pick it up
+    console.log(`New job ${newJobId} created`);
 
     return NextResponse.json({ id: newJobId });
   } catch (error) {
@@ -189,8 +175,7 @@ export async function GET() {
     const jobs = db.prepare(`
       SELECT 
         id, name, source_path, storage_provider_id,
-        schedule, retention_period, compression_enabled,
-        compression_level, status, next_run, last_run,
+        schedule, status, remote_path, next_run, last_run,
         created_at, updated_at
       FROM backup_jobs
       ORDER BY name
@@ -223,11 +208,8 @@ export async function DELETE(request: Request) {
     const db = getDatabase();
     db.prepare(`DELETE FROM backup_jobs WHERE id = ?`).run(id);
     
-    // Reload jobs in the scheduler to remove the deleted job
-    const scheduler = getBreeScheduler();
-    await scheduler.loadJobs();
-    
-    apiLogger.info(`Job ${id} deleted and scheduler reloaded`);
+    // No need to reload the jobs
+    apiLogger.info(`Job ${id} deleted`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

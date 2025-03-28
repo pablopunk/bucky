@@ -168,16 +168,18 @@ type = s3
 provider = Storj
 access_key_id = ${config.accessKey || ""}
 secret_access_key = ${config.secretKey || ""}
-endpoint = gateway.storjshare.io
+endpoint = https://gateway.storjshare.io
 location_constraint = 
 acl = private
+no_check_certificate = true
+force_path_style = true
 `
         }
         
         // Validation check - if we don't have a bucket, return an error
         if (!bucket) {
           return NextResponse.json(
-            { error: "Storage provider bucket not configured", debug: { config } },
+            { error: "Storage provider bucket not configured", debug: { configType: typeof config, configKeys: Object.keys(config) } },
             { status: 400 }
           )
         }
