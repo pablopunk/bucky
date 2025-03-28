@@ -3,7 +3,7 @@
 > [!WARNING]  
 > This software is on a very early alpha stage, do NOT use it for critical data
 
-The self-hosted all-in-one backup solution that doesn't suck.
+The self-hosted all-in-one backup solution that ~doesn't suck~ actually kinda sucks while it's on Alpha amirite
 
 ## Features
 
