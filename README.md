@@ -33,7 +33,7 @@ The self-hosted all-in-one backup solution that ~doesn't suck~ actually kinda su
 
 ![CleanShot 2025-03-28 at 17 51 22](https://github.com/user-attachments/assets/8047e7c4-dfb9-4bf9-8309-801bcaddce97)
 
-## Deploy in docker
+## Deploy in docker
 
 ```yaml
 services:
