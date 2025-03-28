@@ -5,6 +5,7 @@ import path from "path"
 import fs from "fs"
 import nodemailer from "nodemailer"
 import { generateUUID } from "./crypto"
+import { parseRcloneSize, formatBytes } from "./utils"
 
 // Define a type for the Bree scheduler
 interface BreeScheduler {
@@ -319,8 +320,11 @@ export async function runBackupJob(jobId: string) {
     }
 
     // Parse output to get size and other stats
-    const sizeMatch = stdout.match(/Transferred:\s+([0-9.]+\s+[A-Za-z]+)/i);
-    const sizeStr = sizeMatch ? sizeMatch[1] : '0 Bytes';
+    // Calculate the actual size in bytes
+    const sizeBytes = parseRcloneSize(stdout);
+    
+    // Format the size properly with appropriate units
+    const sizeStr = formatBytes(sizeBytes);
     
     // Extract number of transferred files
     const transferredMatch = stdout.match(/Transferred:\s+(\d+)\s+\/\s+(\d+)/);
@@ -347,7 +351,12 @@ export async function runBackupJob(jobId: string) {
       UPDATE backup_history 
       SET status = 'success', end_time = ?, size = ?, message = ? 
       WHERE id = ?
-    `).run(endTime, sizeStr, `Backup completed successfully. Files transferred: ${transferred}, Files deleted: ${deleted}`, historyId);
+    `).run(
+      endTime, 
+      sizeBytes.toString(), // Store raw bytes in database for consistent sorting
+      `Backup completed successfully. Files transferred: ${transferred}, Files deleted: ${deleted}`, 
+      historyId
+    );
     
     return { success: true, size: sizeStr };
   } catch (error: any) {

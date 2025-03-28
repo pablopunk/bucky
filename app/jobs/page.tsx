@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, RefreshCw, Trash, Edit, StopCircle, PauseCircle, PlayCircle } from "lucide-react"
+import { Plus, RefreshCw, Trash, Edit, StopCircle, PauseCircle, PlayCircle, LogsIcon } from "lucide-react"
 import { toast } from "sonner"
 import {
   Tooltip,
@@ -308,9 +308,21 @@ export default function JobsPage() {
                 {jobs.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell className="font-medium">
-                      <Link href={`/jobs/${job.id}`} className="hover:underline">
-                        {job.name}
-                      </Link>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="icon">
+                                <LogsIcon className="h-4 w-4" />
+                              </Button>
+                                <span className="font-bold">{job.name}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Job details</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableCell>
                     <TableCell>{job.source_path}</TableCell>
                     <TableCell>{job.schedule}</TableCell>

@@ -38,7 +38,38 @@ export async function GET(request: Request) {
       history = db.prepare(query).all() as (BackupHistory & { job_name: string })[];
     }
 
-    return NextResponse.json(history);
+    // Process the history records to ensure numeric size values
+    const processedHistory = history.map(record => {
+      // Parse size to number if it's stored as string
+      if (record.size !== null) {
+        // Try to parse as a number first (newer records)
+        const numericSize = Number(record.size);
+        if (!isNaN(numericSize)) {
+          record.size = numericSize;
+        } else {
+          // For older records that might have text like "1.5 MB", extract the number
+          // and convert to bytes
+          const sizeMatch = String(record.size).match(/^([\d.]+)\s*([KMGTPEZYkB]+)/i);
+          if (sizeMatch) {
+            const value = parseFloat(sizeMatch[1]);
+            const unit = sizeMatch[2].toUpperCase();
+            
+            if (unit === 'B' || unit === 'BYTES') record.size = value;
+            else if (unit === 'KB' || unit === 'K') record.size = value * 1024;
+            else if (unit === 'MB' || unit === 'M') record.size = value * 1024 * 1024;
+            else if (unit === 'GB' || unit === 'G') record.size = value * 1024 * 1024 * 1024;
+            else if (unit === 'TB' || unit === 'T') record.size = value * 1024 * 1024 * 1024 * 1024;
+            else record.size = 0;
+          } else {
+            // If no pattern match, default to 0
+            record.size = 0;
+          }
+        }
+      }
+      return record;
+    });
+
+    return NextResponse.json(processedHistory);
   } catch (error) {
     console.error("Error fetching backup history:", error);
     return NextResponse.json(

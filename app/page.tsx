@@ -207,8 +207,14 @@ export default function DashboardPage() {
                   <Clock className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{new Date(stats.nextScheduled.time).toUTCString()}</div>
-                  <p className="text-xs text-muted-foreground">{stats.nextScheduled.jobName}</p>
+                  {stats.nextScheduled.time ? (
+                    <>
+                      <div className="text-2xl font-bold">{new Date(stats.nextScheduled.time).toUTCString()}</div>
+                      <p className="text-xs text-muted-foreground">{stats.nextScheduled.jobName}</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No scheduled backups</p>
+                  )}
                 </CardContent>
               </Card>
             </div>

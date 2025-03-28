@@ -15,6 +15,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InfoIcon, ShieldAlertIcon, AlertTriangleIcon } from "lucide-react"
+import { formatBytes } from "@/lib/utils"
 
 interface BackupJob {
   id: string
@@ -271,11 +272,7 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
 
   const formatSize = (bytes: number | null) => {
     if (bytes === null) return "Unknown"
-    
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+    return formatBytes(bytes);
   }
 
   const getStatusBadge = (status: string) => {
@@ -370,10 +367,7 @@ export default function JobDetailsPage({ params }: { params: { id: string } }) {
   }
   
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+    return formatBytes(bytes);
   }
   
   useEffect(() => {
