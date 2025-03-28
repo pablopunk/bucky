@@ -109,7 +109,6 @@ export default function JobsPage() {
         throw new Error("Failed to fetch backup jobs")
       }
       const data = await response.json()
-      console.log("Jobs data from API:", data)
       setJobs(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
