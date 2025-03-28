@@ -33,6 +33,26 @@ The self-hosted all-in-one backup solution that doesn't suck.
 
 ![CleanShot 2025-03-28 at 17 51 22](https://github.com/user-attachments/assets/8047e7c4-dfb9-4bf9-8309-801bcaddce97)
 
+## Deploy in docker
+
+```yaml
+services:
+  bucky:
+    image: ghcr.io/pablopunk/bucky:latest
+    container_name: bucky
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - bucky-data:/app/data # optional, to persist the database in a volume
+      - /important/folder1:/folder1 # any folder you want to backup (with any path)
+      - /important/folder2:/folder2
+    environment:
+      - DATABASE_PATH=/app/data/bucky.db # optional, to customize the db location
+
+volumes:
+  bucky-data:
+```
 
 ## To do
 
