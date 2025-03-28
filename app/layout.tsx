@@ -62,7 +62,7 @@ if (typeof window === 'undefined' && !schedulerInitialized) {
 }
 
 export const metadata: Metadata = {
-  title: "Bucky Backup Manager",
+  title: "Bucky",
   description: "Manage your backups with ease",
 }
 

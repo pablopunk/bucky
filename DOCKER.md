@@ -1,6 +1,6 @@
 # Docker Support for Bucky Backup Manager
 
-Bucky Backup Manager is available as a Docker image for easy deployment. This document provides instructions for using the Docker image.
+Bucky is available as a Docker image for easy deployment. This document provides instructions for using the Docker image.
 
 ## Available Images
 
@@ -37,7 +37,6 @@ You can configure the application using environment variables:
 docker run -d \
   --name bucky \
   -p 3000:3000 \
-  -v bucky-data:/app/data \
   -e DATABASE_PATH=/app/data/bucky.db \
   -e NODE_ENV=production \
   ghcr.io/pablopunk/bucky:latest
@@ -59,11 +58,9 @@ docker run -d \
 
 ### Docker Compose
 
-Here's an example `docker-compose.yml` file:
+Here's an example `compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
   bucky:
     image: ghcr.io/pablopunk/bucky:latest
@@ -72,10 +69,12 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - bucky-data:/app/data
+      - bucky-data:/app/data # optional, to persist the database in a volume
+      - /important/folder1:/folder1 # any folder you want to backup (with any path)
+      - /important/folder2:/folder2
     environment:
       - NODE_ENV=production
-      - DATABASE_PATH=/app/data/bucky.db
+      - DATABASE_PATH=/app/data/bucky.db # optional, to customize the db location
 
 volumes:
   bucky-data:
