@@ -112,3 +112,12 @@ Logs are stored in the `/logs` directory with daily rotation and component-speci
 
 ## Docker Support
 Designed to run in a single Docker container with proper signal handling for clean shutdowns and database persistence through volume mapping.
+
+## Implementation Notes
+- Uses Bun's SQLite module for database operations with bun:sqlite
+- Implements Bun worker threads for job isolation
+- Uses isolated worker processes to prevent database locking during long-running backups
+- Integrated error handling and notification system for failed backups
+- Configurable logging levels with worker-specific log files
+- Real-time notifications through the UI using Sonner toast system
+- Graceful shutdown handling to complete in-progress jobs
