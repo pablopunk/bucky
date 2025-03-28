@@ -6,6 +6,7 @@ import fs from "fs"
 import nodemailer from "nodemailer"
 import { generateUUID } from "./crypto"
 import { parseRcloneSize, formatBytes } from "./utils"
+import { parseExpression } from 'cron-parser'
 
 // Define a type for the Bree scheduler
 interface BreeScheduler {
@@ -86,6 +87,44 @@ export function scheduleJobs() {
   return Promise.resolve()
 }
 
+// Function to calculate and update the next run time for a job
+export async function updateNextRunTime(jobId: string): Promise<void> {
+  const db = getDatabase();
+  
+  try {
+    // Get the job details
+    const job = getBackupJob(jobId);
+    if (!job) {
+      jobLogger.error(`Cannot update next_run for job ${jobId}: Job not found`);
+      return;
+    }
+    
+    // Skip if job is paused or has no schedule
+    if (job.status === 'paused' || !job.schedule) {
+      jobLogger.info(`Job ${jobId} is paused or has no schedule, skipping next_run update`);
+      return;
+    }
+    
+    try {
+      // Parse cron expression to get next run time
+      const interval = parseExpression(job.schedule);
+      const nextRun = interval.next().toDate();
+      
+      // Update next_run time in database
+      jobLogger.info(`Updating next_run for job ${jobId} to ${nextRun.toISOString()}`);
+      db.prepare(`
+        UPDATE backup_jobs SET next_run = ? WHERE id = ?
+      `).run(nextRun.toISOString(), jobId);
+      
+    } catch (error: any) {
+      jobLogger.error(`Failed to calculate next run time for job ${jobId}:`, { error: error.message });
+      // Don't throw here, as we don't want a bad schedule to break everything
+    }
+  } catch (error: any) {
+    jobLogger.error(`Error updating next run time for job ${jobId}:`, { error: error.message });
+  }
+}
+
 // Creates a temporary rclone config file for this job
 async function createRcloneConfig(providerId: string): Promise<string> {
   try {
@@ -100,7 +139,6 @@ async function createRcloneConfig(providerId: string): Promise<string> {
       name: provider.name,
       type: provider.type,
       hasConfig: provider.hasOwnProperty('config'),
-      hasCredentials: provider.hasOwnProperty('credentials'),
       providerKeys: Object.keys(provider)
     }, null, 2)}`);
     
@@ -186,7 +224,6 @@ secret_access_key = ${credentials.secretKey}
 endpoint = ${credentials.endpoint || 'https://gateway.storjshare.io'}
 location_constraint = 
 acl = ${credentials.acl || 'private'}
-no_check_certificate = true
 force_path_style = true
 `;
     } else {
@@ -196,6 +233,8 @@ force_path_style = true
     // Write the config file
     fs.writeFileSync(configFile, configContent);
     jobLogger.info(`Created rclone config file at ${configFile}`);
+    
+    jobLogger.info("Config content:", configContent);
     
     return configFile;
   } catch (error: unknown) {
@@ -358,6 +397,18 @@ export async function runBackupJob(jobId: string) {
       historyId
     );
     
+    // Send email notification for successful job
+    try {
+      const successMessage = `Backup completed successfully. Size: ${sizeStr}, Files transferred: ${transferred}, Files deleted: ${deleted}`;
+      await sendJobSuccessNotification(job.name, successMessage);
+      jobLogger.info(`Sent success notification email for job ${jobId}`);
+    } catch (notifyError: any) {
+      jobLogger.error(`Error sending success notification: ${notifyError.message}`);
+    }
+    
+    // Update the next_run time for this job
+    await updateNextRunTime(jobId);
+    
     return { success: true, size: sizeStr };
   } catch (error: any) {
     jobLogger.error(`Failed to run backup job: ${jobId}`, { error: error.message || 'Unknown error' });
@@ -391,6 +442,9 @@ export async function runBackupJob(jobId: string) {
       } catch (notifyError: any) {
         jobLogger.error(`Error sending notification: ${notifyError.message}`);
       }
+      
+      // Still try to update next_run time, if the job is not completely broken
+      await updateNextRunTime(jobId);
     } catch (dbError) {
       jobLogger.error(`Failed to update job status for ${jobId}:`, { error: dbError });
     }
@@ -500,6 +554,12 @@ async function sendJobFailureNotification(jobName: string, errorMessage: string)
         continue;
       }
       
+      // Skip if failure notifications are disabled for this recipient
+      if (recipient.on_failure === 0 || recipient.on_failure === false) {
+        jobLogger.info(`Failure notifications disabled for ${recipient.email}, skipping`);
+        continue;
+      }
+      
       try {
         await transporter.sendMail({
           from: smtpConfig.sender_email || smtpConfig.username,
@@ -510,6 +570,110 @@ async function sendJobFailureNotification(jobName: string, errorMessage: string)
         });
         
         jobLogger.info(`Sent failure notification email to ${recipient.email} for job ${jobName}`);
+      } catch (emailError: any) {
+        jobLogger.error(`Failed to send email to ${recipient.email}: ${emailError.message}`);
+        // Continue with other recipients even if one fails
+      }
+    }
+  } catch (error: any) {
+    jobLogger.error(`Failed to send email notification: ${error.message}`);
+    throw error;
+  }
+}
+
+// Function to send email notification for job successes
+async function sendJobSuccessNotification(jobName: string, message: string): Promise<void> {
+  try {
+    // Get SMTP settings from database
+    const db = getDatabase();
+    const smtpConfig = db.prepare('SELECT * FROM smtp_config LIMIT 1').get() as any;
+    
+    if (!smtpConfig) {
+      throw new Error('No SMTP configuration found in database');
+    }
+    
+    // Log SMTP config for debugging (redact password)
+    const smtpDebug = {...smtpConfig};
+    if (smtpDebug.password) smtpDebug.password = '******';
+    jobLogger.info(`SMTP config: ${JSON.stringify(smtpDebug)}`);
+    
+    // Get notification settings (all recipients, without filtering by enabled status)
+    // This avoids assuming 'enabled' column exists
+    const notificationSettings = db.prepare('SELECT * FROM notification_settings').all() as any[];
+    
+    jobLogger.info(`Found ${notificationSettings.length} notification settings records`);
+    
+    if (!notificationSettings || notificationSettings.length === 0) {
+      throw new Error('No notification recipients found');
+    }
+    
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.secure === 1,
+      auth: {
+        user: smtpConfig.username,
+        pass: smtpConfig.password,
+      }
+    });
+    
+    // Prepare email content
+    const subject = `Backup Job Succeeded: ${jobName}`;
+    const text = `
+    Backup Job Success Notification
+    
+    Job Name: ${jobName}
+    Time: ${new Date().toLocaleString()}
+    Message: ${message}
+    
+    Please check the logs for more details.
+    `;
+    
+    const html = `
+    <h2>Backup Job Success Notification</h2>
+    <p>A backup job has succeeded.</p>
+    <table border="0" cellpadding="5">
+      <tr>
+        <td><strong>Job Name:</strong></td>
+        <td>${jobName}</td>
+      </tr>
+      <tr>
+        <td><strong>Time:</strong></td>
+        <td>${new Date().toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td><strong>Message:</strong></td>
+        <td>${message}</td>
+      </tr>
+    </table>
+    <p>Please check the logs for more details.</p>
+    `;
+    
+    // Send to all recipients
+    for (const recipient of notificationSettings) {
+      // Skip recipients without email addresses
+      if (!recipient.email) {
+        jobLogger.warn(`Skipping notification recipient without email address: ${JSON.stringify(recipient)}`);
+        continue;
+      }
+      
+      // Skip if success notifications are disabled for this recipient
+      if (recipient.on_success === 0 || recipient.on_success === false) {
+        jobLogger.info(`Success notifications disabled for ${recipient.email}, skipping`);
+        continue;
+      }
+      
+      try {
+        await transporter.sendMail({
+          from: smtpConfig.sender_email || smtpConfig.username,
+          to: recipient.email,
+          subject,
+          text,
+          html
+        });
+        
+        jobLogger.info(`Sent success notification email to ${recipient.email} for job ${jobName}`);
       } catch (emailError: any) {
         jobLogger.error(`Failed to send email to ${recipient.email}: ${emailError.message}`);
         // Continue with other recipients even if one fails

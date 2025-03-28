@@ -5,6 +5,7 @@ import { parseExpression } from 'cron-parser';
 import pRetry from 'p-retry';
 import type { BackupJob } from '../db';
 import type { Job } from 'bree';
+import { generateUUID } from '../crypto';
 
 // Queue for running jobs to prevent database locking
 const runningJobsQueue: string[] = [];
@@ -272,6 +273,12 @@ export class BreeScheduler {
           continue;
         }
         
+        // Skip if schedule is empty
+        if (!job.schedule || job.schedule.trim() === '') {
+          console.log(`Job ${job.id} has an empty schedule, skipping`);
+          continue;
+        }
+        
         try {
           // Parse cron expression to get next run time
           const interval = parseExpression(job.schedule);
@@ -314,6 +321,77 @@ export class BreeScheduler {
       db.prepare(`
         UPDATE backup_jobs SET next_run = NULL WHERE status = 'paused'
       `).run();
+      
+      // Also make sure "failed" and "in_progress" jobs that have been stuck have a correct next_run
+      try {
+        // Check for in_progress jobs that have been running for too long (1 hour)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const stuckJobs = db.prepare(`
+          SELECT id, name, status FROM backup_jobs 
+          WHERE status = 'in_progress' AND updated_at < ?
+        `).all(oneHourAgo) as { id: string, name: string, status: string }[];
+        
+        if (stuckJobs.length > 0) {
+          console.log(`Found ${stuckJobs.length} stuck in_progress jobs, resetting status`);
+          
+          for (const job of stuckJobs) {
+            console.log(`Resetting stuck job ${job.id} (${job.name})`);
+            
+            // Update job status to failed
+            db.prepare(`
+              UPDATE backup_jobs SET status = 'failed', updated_at = ? WHERE id = ?
+            `).run(new Date().toISOString(), job.id);
+            
+            // Add a history record
+            db.prepare(`
+              INSERT INTO backup_history (id, job_id, status, start_time, end_time, message, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              generateUUID(),
+              job.id,
+              'failed',
+              new Date().toISOString(),
+              new Date().toISOString(),
+              'Job was stuck in progress for too long and was automatically reset',
+              new Date().toISOString()
+            );
+          }
+        }
+        
+        // Recalculate next_run for all active jobs with a schedule but missing next_run
+        const jobsNeedingNextRun = db.prepare(`
+          SELECT id, name, schedule FROM backup_jobs 
+          WHERE status = 'active' AND schedule IS NOT NULL AND next_run IS NULL
+        `).all() as { id: string, name: string, schedule: string }[];
+        
+        if (jobsNeedingNextRun.length > 0) {
+          console.log(`Found ${jobsNeedingNextRun.length} active jobs missing next_run times`);
+          
+          for (const job of jobsNeedingNextRun) {
+            try {
+              // Skip if schedule is empty
+              if (!job.schedule || job.schedule.trim() === '') {
+                continue;
+              }
+              
+              // Parse cron expression to get next run time
+              const interval = parseExpression(job.schedule);
+              const nextRun = interval.next().toDate();
+              
+              // Update next_run time in database
+              db.prepare(`
+                UPDATE backup_jobs SET next_run = ? WHERE id = ?
+              `).run(nextRun.toISOString(), job.id);
+              
+              console.log(`Updated missing next_run for job ${job.id} (${job.name}) to ${nextRun}`);
+            } catch (scheduleError) {
+              console.error(`Failed to parse schedule for job ${job.id}:`, scheduleError);
+            }
+          }
+        }
+      } catch (maintenanceError) {
+        console.error('Error during job maintenance:', maintenanceError);
+      }
       
       // Update Bree's job array - remove all jobs first then add new definitions
       this.bree.remove();

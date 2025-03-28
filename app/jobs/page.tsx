@@ -311,10 +311,10 @@ export default function JobsPage() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-2">
-                              <Button variant="outline" size="icon">
+                              <Button variant="outline" size="icon" onClick={() => window.location.href = `/jobs/${job.id}`}>
                                 <LogsIcon className="h-4 w-4" />
                               </Button>
-                                <span className="font-bold">{job.name}</span>
+                              <span className="font-bold">{job.name}</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>

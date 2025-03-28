@@ -37,6 +37,23 @@ export default function EditStorageProviderPage({ params }: { params: Promise<{ 
   const [secretKey, setSecretKey] = useState("")
   const [endpoint, setEndpoint] = useState("")
   const [region, setRegion] = useState("")
+  const [nameError, setNameError] = useState<string | null>(null)
+
+  const validateName = (value: string): boolean => {
+    if (!value) {
+      setNameError("Name is required");
+      return false;
+    }
+    
+    const namePattern = /^[a-zA-Z0-9_-]+$/;
+    if (!namePattern.test(value)) {
+      setNameError("Name can only contain letters, numbers, hyphens, and underscores");
+      return false;
+    }
+    
+    setNameError(null);
+    return true;
+  };
 
   useEffect(() => {
     fetchProvider()
@@ -78,6 +95,12 @@ export default function EditStorageProviderPage({ params }: { params: Promise<{ 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate the name field first
+    if (!validateName(name)) {
+      return;
+    }
+    
     setLoading(true)
     setError(null)
 
@@ -157,9 +180,16 @@ export default function EditStorageProviderPage({ params }: { params: Promise<{ 
                   id="name"
                   placeholder="My Storage Provider"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    validateName(e.target.value);
+                  }}
                   required
+                  className={nameError ? "border-destructive" : ""}
                 />
+                {nameError && (
+                  <p className="text-sm text-destructive">{nameError}</p>
+                )}
               </div>
 
               <div className="space-y-2">

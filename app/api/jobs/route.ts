@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createBackupJob, getBackupJob, getDatabase } from "@/lib/db";
-import { getBreeScheduler } from "@/lib/backup";
+import { getBreeScheduler, updateNextRunTime } from "@/lib/backup";
 import { StorageProviderManager } from "@/lib/storage";
 import { z } from "zod";
 import type { BackupJob } from "@/lib/db";
@@ -14,6 +14,9 @@ const backupJobSchema = z.object({
   schedule: z.string().min(1),
   remotePath: z.string().min(1),
   notifications: z.boolean().optional().default(true),
+  retentionPeriod: z.number().nullable().optional(),
+  compressionEnabled: z.boolean().optional().default(false),
+  compressionLevel: z.number().optional().default(6),
 });
 
 export async function POST(request: Request) {
@@ -48,6 +51,7 @@ export async function POST(request: Request) {
         db.prepare(
           `UPDATE backup_jobs 
            SET status = 'paused', 
+               next_run = NULL,
                updated_at = ?
            WHERE id = ?`
         ).run(new Date().toISOString(), jobId);
@@ -64,7 +68,9 @@ export async function POST(request: Request) {
            WHERE id = ?`
         ).run(new Date().toISOString(), jobId);
 
-        // No need to reload the scheduler
+        // Calculate and update the next_run time
+        await updateNextRunTime(jobId);
+
         return NextResponse.json({ success: true });
       }
 
@@ -149,11 +155,15 @@ export async function POST(request: Request) {
       remote_path: validatedData.remotePath,
       status: "active" as const,
       next_run: null,
-      last_run: null
+      last_run: null,
+      retention_period: validatedData.retentionPeriod || null,
+      compression_enabled: validatedData.compressionEnabled || false,
+      compression_level: validatedData.compressionLevel || 6
     });
 
-    // No need to explicitly load the job - the scheduler will pick it up
-    console.log(`New job ${newJobId} created`);
+    // Calculate and update the next_run time for the new job
+    await updateNextRunTime(newJobId);
+    apiLogger.info(`New job ${newJobId} created with next_run time calculated`);
 
     return NextResponse.json({ id: newJobId });
   } catch (error) {

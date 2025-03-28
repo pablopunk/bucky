@@ -4,8 +4,9 @@ import { StorageProviderManager } from "@/lib/storage";
 import { z } from "zod";
 import { prepare } from "@/lib/db";
 
+// Define a schema for Storj credentials that matches the StorjConfig interface
+// Remove the 'type' field from the credentials schema since it's redundant
 const storjCredentialsSchema = z.object({
-  type: z.literal("storj"),
   bucket: z.string().min(1),
   accessKey: z.string().min(1),
   secretKey: z.string().min(1),
@@ -13,7 +14,9 @@ const storjCredentialsSchema = z.object({
 });
 
 const storageProviderSchema = z.object({
-  name: z.string().min(1),
+  name: z.string()
+    .min(1, "Name is required")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Name can only contain letters, numbers, hyphens, and underscores"),
   type: z.literal("storj"),
   credentials: storjCredentialsSchema,
 });
